@@ -1,12 +1,14 @@
-# openclaw-n8n
+# n8n-ops-mcp
 
-n8n ops plugin for [OpenClaw](https://github.com/openclaw/openclaw). List, inspect, trigger, and safely edit n8n workflows from OpenClaw agents.
+Ops-focused n8n tools for Claude-compatible clients. List, inspect, trigger, validate, and safely edit n8n workflows from any MCP host — with first-class [OpenClaw](https://github.com/openclaw/openclaw) support.
 
 Status: v0.1.0 — read + trigger + validate + activate/deactivate/save (behind `enableEdit` with auto-backup). MCP wrapper and npm publish next.
 
 ## Why
 
-OpenClaw agents have no native awareness of your n8n footprint. If a pipeline breaks, you SSH to the host or open the n8n UI. With this plugin, your main agent can answer "what's broken in my n8n?" from chat, and trigger manual workflows without you leaving Discord/Telegram.
+Your AI agent has no native awareness of your n8n footprint. If a pipeline breaks, you SSH to the host or open the n8n UI. With this package, your agent can answer "what's broken in my n8n?" from chat, and trigger manual workflows without you leaving your client.
+
+This is an **ops** tool — focused on listing, triggering, validating, and editing workflows. If you want a catalog/docs tool that indexes n8n's node library, see [n8n-mcp](https://www.npmjs.com/package/n8n-mcp).
 
 ## Tools
 
@@ -37,10 +39,12 @@ OpenClaw agents have no native awareness of your n8n footprint. If a pipeline br
 ## Install
 
 ```bash
-git clone https://github.com/solomonneas/openclaw-n8n.git
-cd openclaw-n8n
+git clone https://github.com/solomonneas/n8n-ops-mcp.git
+cd n8n-ops-mcp
 npm install
 ```
+
+### OpenClaw
 
 Register in `~/.openclaw/openclaw.json`:
 
@@ -49,7 +53,7 @@ Register in `~/.openclaw/openclaw.json`:
   "plugins": {
     "allow": ["n8n"],
     "load": {
-      "paths": ["/path/to/openclaw-n8n"]
+      "paths": ["/path/to/n8n-ops-mcp"]
     },
     "entries": {
       "n8n": {
@@ -90,10 +94,8 @@ systemctl --user restart openclaw-gateway
 
 ## Client setups
 
-This plugin is for OpenClaw specifically. For other Claude-compatible clients, wrap the tools in an MCP server (not in scope yet).
-
 - **OpenClaw:** see Install above.
-- **Claude Desktop / Claude Code / Codex CLI / Hermes Agent:** pending, via MCP wrapper.
+- **Claude Desktop / Claude Code / Codex CLI / Hermes Agent:** pending, via the MCP wrapper entry point (shipping in v0.2.0).
 
 ## Roadmap
 

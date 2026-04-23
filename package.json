@@ -1,15 +1,18 @@
 {
-  "name": "openclaw-n8n",
+  "name": "n8n-ops-mcp",
   "version": "0.1.0",
-  "description": "n8n ops plugin for OpenClaw. List, inspect, trigger, and safely edit n8n workflows from OpenClaw agents.",
+  "description": "Ops-focused n8n tools (list, inspect, trigger, validate, save) for Claude-compatible clients. MCP server + first-class OpenClaw plugin.",
   "private": true,
   "type": "module",
   "license": "MIT",
   "author": "Solomon Neas <srneas@gmail.com>",
+  "keywords": ["n8n", "mcp", "model-context-protocol", "openclaw", "workflow", "ops", "automation"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/solomonneas/openclaw-n8n.git"
+    "url": "https://github.com/solomonneas/n8n-ops-mcp.git"
   },
+  "homepage": "https://github.com/solomonneas/n8n-ops-mcp",
+  "bugs": "https://github.com/solomonneas/n8n-ops-mcp/issues",
   "openclaw": {
     "extensions": ["./index.ts"]
   },
