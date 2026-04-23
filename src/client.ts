@@ -28,6 +28,46 @@ export interface N8nListResponse<T> {
   nextCursor?: string;
 }
 
+export type N8nExecutionStatus =
+  | "success"
+  | "error"
+  | "running"
+  | "waiting"
+  | "canceled"
+  | "new"
+  | "unknown";
+
+export interface N8nExecutionSummary {
+  id: string | number;
+  finished: boolean;
+  mode: string;
+  retryOf?: string | number | null;
+  retrySuccessId?: string | number | null;
+  status?: N8nExecutionStatus | string;
+  workflowId: string;
+  startedAt?: string;
+  stoppedAt?: string;
+  createdAt?: string;
+  waitTill?: string | null;
+}
+
+export interface N8nExecution extends N8nExecutionSummary {
+  data?: {
+    resultData?: {
+      runData?: Record<string, unknown>;
+      error?: unknown;
+      lastNodeExecuted?: string;
+    };
+    executionData?: unknown;
+    startData?: unknown;
+  };
+  workflowData?: {
+    id?: string;
+    name?: string;
+    active?: boolean;
+  };
+}
+
 export class N8nApiError extends Error {
   constructor(
     public readonly status: number,
@@ -73,6 +113,24 @@ export class N8nClient {
       throw new Error(`Invalid workflow id: ${id}`);
     }
     return this.request<N8nWorkflow>(`/api/v1/workflows/${id}`);
+  }
+
+  async listExecutions(params: {
+    workflowId?: string;
+    status?: string;
+    limit?: number;
+    cursor?: string;
+    includeData?: boolean;
+  } = {}): Promise<N8nListResponse<N8nExecutionSummary>> {
+    const qs = new URLSearchParams();
+    if (params.workflowId) qs.set("workflowId", params.workflowId);
+    if (params.status) qs.set("status", params.status);
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.cursor) qs.set("cursor", params.cursor);
+    if (params.includeData) qs.set("includeData", "true");
+    return this.request<N8nListResponse<N8nExecutionSummary>>(
+      `/api/v1/executions${qs.toString() ? `?${qs}` : ""}`,
+    );
   }
 
   private async request<T>(

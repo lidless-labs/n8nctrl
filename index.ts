@@ -3,6 +3,7 @@ import type { N8nClient } from "./src/client.ts";
 import { makeClient, resolveConfig, type N8nPluginConfig } from "./src/config.ts";
 import { createListWorkflowsTool } from "./src/tools/list-workflows.ts";
 import { createGetWorkflowTool } from "./src/tools/get-workflow.ts";
+import { createListExecutionsTool } from "./src/tools/list-executions.ts";
 
 export default definePluginEntry({
   id: "n8n",
@@ -17,6 +18,7 @@ export default definePluginEntry({
 
     api.registerTool(createListWorkflowsTool(getClient) as AnyAgentTool);
     api.registerTool(createGetWorkflowTool(getClient) as AnyAgentTool);
+    api.registerTool(createListExecutionsTool(getClient) as AnyAgentTool);
   },
 });
 

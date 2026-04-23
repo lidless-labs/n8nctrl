@@ -22,3 +22,12 @@ if (list.data.length > 0) {
   const nodes = Array.isArray(wf.nodes) ? wf.nodes.length : 0;
   console.log(`\nFetched workflow ${wf.id} (${wf.name}): ${nodes} nodes`);
 }
+
+const executions = await client.listExecutions({ limit: 5 });
+console.log(`\nListed ${executions.data.length} executions:`);
+for (const ex of executions.data) {
+  const status = ex.status ?? (ex.finished ? "success" : "running");
+  console.log(
+    `  - ${ex.id}  workflow=${ex.workflowId}  status=${status}  mode=${ex.mode}  started=${ex.startedAt ?? "?"}`,
+  );
+}
