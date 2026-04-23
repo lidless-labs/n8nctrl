@@ -2,7 +2,7 @@
 
 n8n ops plugin for [OpenClaw](https://github.com/openclaw/openclaw). List, inspect, trigger, and safely edit n8n workflows from OpenClaw agents.
 
-Status: v0.0.3 — read + trigger (`n8n_list_workflows`, `n8n_get_workflow`, `n8n_list_executions`, `n8n_get_execution`, `n8n_trigger`). Edit tools behind `enableEdit` still pending.
+Status: v0.0.4 — read + trigger + webhook discovery (`n8n_list_workflows`, `n8n_get_workflow`, `n8n_list_executions`, `n8n_get_execution`, `n8n_trigger`, `n8n_list_webhooks`). Edit tools behind `enableEdit` still pending.
 
 ## Why
 
@@ -17,6 +17,8 @@ OpenClaw agents have no native awareness of your n8n footprint. If a pipeline br
 **`n8n_list_executions`** - list recent executions with optional `workflowId`, `status` (success/error/running/waiting/canceled), `limit` filters. Returns id, workflowId, workflowName, status, mode, startedAt, stoppedAt.
 
 **`n8n_get_execution`** - fetch one execution by id. Includes per-node run log (truncated to `maxExecutionLogBytes`, default 64 KB, with a tail hint when it exceeds) and the raw error object verbatim when status is `error`. Pass `includeRunData: false` to skip the run log and get just status + error.
+
+**`n8n_list_webhooks`** - scan workflows for webhook and form-trigger nodes and return their paths + fully-formed `triggerUrl`. Pairs with `n8n_trigger` mode='webhook' so agents can discover and call webhooks without opening n8n. Optional `workflowId` for a single workflow, `activeOnly` (default true), `limit` (default 50).
 
 **`n8n_trigger`** - run a workflow. Two modes:
 - `mode: "webhook"` + `webhookPath` - POST (or GET/PUT/DELETE) to the configured base URL + path, with an optional JSON `payload`. This is the reliable path.
@@ -90,6 +92,7 @@ This plugin is for OpenClaw specifically. For other Claude-compatible clients, w
 - [x] `n8n_list_executions`
 - [x] `n8n_get_execution`
 - [x] `n8n_trigger` (webhook + manual)
+- [x] `n8n_list_webhooks` (surface webhook paths for mode='webhook')
 - [ ] `n8n_search_executions` (text search across run logs)
 - [ ] `n8n_save_workflow` with auto-backup + rollback-on-failure (behind `enableEdit`)
 - [ ] `n8n_activate` / `n8n_deactivate`

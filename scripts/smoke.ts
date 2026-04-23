@@ -67,3 +67,24 @@ if (inactive) {
 function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, max) + "…";
 }
+
+console.log("\nScanning active workflows for webhook triggers:");
+const activeList = await client.listWorkflows({ active: true, limit: 20 });
+let webhookHits = 0;
+for (const w of activeList.data) {
+  const wf = await client.getWorkflow(w.id);
+  if (!Array.isArray(wf.nodes)) continue;
+  for (const raw of wf.nodes) {
+    if (!raw || typeof raw !== "object") continue;
+    const node = raw as Record<string, unknown>;
+    const type = String(node.type ?? "");
+    if (type === "n8n-nodes-base.webhook" || type === "n8n-nodes-base.formTrigger") {
+      const params = (node.parameters as Record<string, unknown>) ?? {};
+      const path = typeof params.path === "string" ? params.path : (node.webhookId as string | undefined) ?? "";
+      const method = typeof params.httpMethod === "string" ? params.httpMethod : "POST";
+      console.log(`  - ${wf.name}  node=${node.name}  method=${method}  path=/webhook/${path}`);
+      webhookHits++;
+    }
+  }
+}
+console.log(`  total webhooks found: ${webhookHits}`);
