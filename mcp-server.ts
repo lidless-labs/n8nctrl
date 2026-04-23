@@ -18,8 +18,9 @@ import { createValidateWorkflowTool } from "./src/tools/validate-workflow.ts";
 import { createActivateTool } from "./src/tools/activate.ts";
 import { createDeactivateTool } from "./src/tools/deactivate.ts";
 import { createSaveWorkflowTool } from "./src/tools/save-workflow.ts";
+import { createCancelExecutionTool } from "./src/tools/cancel-execution.ts";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 function readConfigFromEnv(): N8nPluginConfig {
   const baseUrl = (process.env.N8N_BASE_URL ?? "").trim();
@@ -271,6 +272,14 @@ async function main(): Promise<void> {
           .describe("Must be true to actually write. Snapshot to backupDir happens regardless."),
       },
     );
+
+    bind(server, createCancelExecutionTool(getClient), {
+      id: z
+        .string()
+        .describe(
+          "Execution id to stop (from n8n_list_executions or n8n_search_executions).",
+        ),
+    });
   }
 
   const transport = new StdioServerTransport();

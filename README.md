@@ -29,6 +29,7 @@ For a catalog/docs tool that indexes n8n's node library, see [n8n-mcp](https://w
 | `n8n_activate` | Enable a workflow's triggers | ✓ |
 | `n8n_deactivate` | Disable a workflow's triggers | ✓ |
 | `n8n_save_workflow` | Overwrite a workflow with auto-backup + validation + confirm gate | ✓ |
+| `n8n_cancel_execution` | Stop a running or waiting execution by id | ✓ |
 
 Write tools are hidden unless `N8N_ENABLE_EDIT=true`.
 
@@ -56,6 +57,8 @@ Write tools are hidden unless `N8N_ENABLE_EDIT=true`.
 **`n8n_activate`** / **`n8n_deactivate`** — idempotent. Deactivating does not cancel running executions.
 
 **`n8n_save_workflow`** — before writing: fetches the current version, snapshots it to `backupDir` as `<id>-<timestamp>.json` (mode 0600), runs `validateWorkflow` on the proposed state, and aborts on error-severity issues (pass `skipValidation: true` to bypass). Requires `confirm: true` to actually PUT. Response includes the backup path and a `restoreHint`.
+
+**`n8n_cancel_execution`** — `POST /executions/{id}/stop`. Closes the triage loop after `n8n_search_executions` locates a stuck run. Returns a success summary with the execution's final status, or `ok: false` with `reason: "not_found_or_finished"` if the id no longer matches a running execution (404).
 
 </details>
 
@@ -228,6 +231,10 @@ Calls `n8n_list_workflows` then `n8n_validate_workflow` per id, filters for `cod
 > Deactivate the "experimental-bot" workflow *(requires `N8N_ENABLE_EDIT=true`)*
 
 Calls `n8n_list_workflows` with a name filter, then `n8n_deactivate` on the matching id.
+
+> Kill the execution stuck on ECONNREFUSED *(requires `N8N_ENABLE_EDIT=true`)*
+
+Calls `n8n_search_executions` with `query: "ECONNREFUSED"`, then `n8n_cancel_execution` on the match.
 
 ## Development
 

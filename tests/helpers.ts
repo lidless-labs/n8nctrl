@@ -24,6 +24,7 @@ export function makeFakeClient(overrides: Partial<FakeClient> = {}): N8nClient {
     postWebhook: vi.fn(),
     getExecution: vi.fn(),
     listExecutions: vi.fn(),
+    stopExecution: vi.fn(),
   } as unknown as FakeClient;
   return { ...base, ...overrides } as unknown as N8nClient;
 }
