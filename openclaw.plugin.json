@@ -1,7 +1,7 @@
 {
   "id": "n8n",
   "name": "n8n Ops",
-  "description": "List, inspect, and trigger n8n workflows from OpenClaw agents. Optional edit tools behind a flag with auto-backup and rollback on failure.",
+  "description": "Ops-focused n8n tools for OpenClaw agents: list, inspect, trigger, validate, plus full workflow + execution lifecycle (create, save, archive, delete, cancel, retry) behind an edit flag. Auto-backup + confirm gates on destructive writes.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

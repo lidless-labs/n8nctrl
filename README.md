@@ -4,15 +4,15 @@
 [![license](https://img.shields.io/npm/l/n8n-ops-mcp.svg)](./LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-blue)](https://modelcontextprotocol.io)
 
-Ops-focused n8n tools for Claude-compatible clients. List, inspect, trigger, validate, and safely edit n8n workflows from any MCP host — with first-class [OpenClaw](https://github.com/openclaw/openclaw) support.
+Ops-focused n8n tools for any MCP-compatible client. List, inspect, trigger, validate, and safely edit n8n workflows - with auto-backup and confirm gates on destructive writes.
 
-Works with Claude Desktop, Claude Code, OpenClaw, Hermes Agent, Codex CLI, and any other MCP-compatible client.
+Built for [OpenClaw](https://github.com/openclaw/openclaw) as a first-class plugin, exposed as an MCP server for everyone else. Works with Claude Desktop, Claude Code, Codex CLI, Hermes Agent, Cursor, Windsurf, or any other MCP host. No hard dependency on a specific model or agent harness.
 
 ## Why
 
-Your AI agent has no native awareness of your n8n footprint. With this package, it can answer "what's broken in my n8n?" and trigger workflows from chat without you leaving your client.
+Your agent has no native awareness of your n8n footprint. With this package, it can answer "what's broken in my n8n?", trigger workflows from chat, or clean up old executions without you leaving your client.
 
-For a catalog/docs tool that indexes n8n's node library, see [n8n-mcp](https://www.npmjs.com/package/n8n-mcp). This one is ops-focused — list, trigger, validate, edit.
+For a catalog/docs tool that indexes n8n's node library, see [n8n-mcp](https://www.npmjs.com/package/n8n-mcp). This one is ops-focused - list, trigger, validate, edit.
 
 ## Tools
 
@@ -43,43 +43,43 @@ Write tools are hidden unless `N8N_ENABLE_EDIT=true`.
 <details>
 <summary><b>Detailed tool reference</b></summary>
 
-**`n8n_list_workflows`** — filter by `active`, `tags`, `name` (substring), `limit`. Returns id, name, active state, tags, updatedAt.
+**`n8n_list_workflows`** - filter by `active`, `tags`, `name` (substring), `limit`. Returns id, name, active state, tags, updatedAt.
 
-**`n8n_get_workflow`** — fetch one by id. Returns metadata by default. Pass `includeDefinition: true` for the full node graph + connections.
+**`n8n_get_workflow`** - fetch one by id. Returns metadata by default. Pass `includeDefinition: true` for the full node graph + connections.
 
-**`n8n_list_executions`** — filter by `workflowId`, `status` (success/error/running/waiting/canceled), `limit`. Returns id, workflowId, workflowName, status, mode, startedAt, stoppedAt.
+**`n8n_list_executions`** - filter by `workflowId`, `status` (success/error/running/waiting/canceled), `limit`. Returns id, workflowId, workflowName, status, mode, startedAt, stoppedAt.
 
-**`n8n_get_execution`** — includes per-node run log (truncated to `maxExecutionLogBytes`, default 64 KB) and the raw error object verbatim when status is `error`. Pass `includeRunData: false` to skip the run log.
+**`n8n_get_execution`** - includes per-node run log (truncated to `maxExecutionLogBytes`, default 64 KB) and the raw error object verbatim when status is `error`. Pass `includeRunData: false` to skip the run log.
 
-**`n8n_search_executions`** — defaults to scanning `status=error` executions for a `query` fragment (e.g. `ECONNREFUSED`) and returning matches with workflow context + a snippet around each hit. `scope: "error"` (default) greps the error payload only; `scope: "all"` also greps full per-node run data (slower, may return node outputs — treat snippets as sensitive). Optional `workflowId`, `status`, `limit` (default 50, max 250), `maxMatches` (default 20), `snippetChars` (default 160). Returns `matches` plus a `skipped` array for any execution that failed to fetch.
+**`n8n_search_executions`** - defaults to scanning `status=error` executions for a `query` fragment (e.g. `ECONNREFUSED`) and returning matches with workflow context + a snippet around each hit. `scope: "error"` (default) greps the error payload only; `scope: "all"` also greps full per-node run data (slower, may return node outputs - treat snippets as sensitive). Optional `workflowId`, `status`, `limit` (default 50, max 250), `maxMatches` (default 20), `snippetChars` (default 160). Returns `matches` plus a `skipped` array for any execution that failed to fetch.
 
-**`n8n_list_webhooks`** — scans workflows for webhook and form-trigger nodes and returns their paths + fully-formed `triggerUrl`. Pairs with `n8n_trigger` mode='webhook'. Optional `workflowId`, `activeOnly` (default true), `limit` (default 50).
+**`n8n_list_webhooks`** - scans workflows for webhook and form-trigger nodes and returns their paths + fully-formed `triggerUrl`. Pairs with `n8n_trigger` mode='webhook'. Optional `workflowId`, `activeOnly` (default true), `limit` (default 50).
 
-**`n8n_validate_workflow`** — checks for deprecated node types (function → code), legacy Code-node API (`$node[]`, `items` global, `require()`), orphan nodes, disabled nodes, missing trigger. Returns issues with severity (error/warning/info) plus a summary count.
+**`n8n_validate_workflow`** - checks for deprecated node types (function → code), legacy Code-node API (`$node[]`, `items` global, `require()`), orphan nodes, disabled nodes, missing trigger. Returns issues with severity (error/warning/info) plus a summary count.
 
-**`n8n_trigger`** — two modes:
-- `mode: "webhook"` + `webhookPath` — POST (or GET/PUT/DELETE) to the configured base URL + path, with an optional JSON `payload`. This is the reliable path.
-- `mode: "workflow"` + `workflowId` — attempts `POST /api/v1/workflows/:id/execute`. Pre-checks that the workflow is active and has a webhook/manual/form trigger. Most n8n builds don't expose this endpoint on the Public API and will 405; the tool surfaces a hint to switch to webhook mode.
+**`n8n_trigger`** - two modes:
+- `mode: "webhook"` + `webhookPath` - POST (or GET/PUT/DELETE) to the configured base URL + path, with an optional JSON `payload`. This is the reliable path.
+- `mode: "workflow"` + `workflowId` - attempts `POST /api/v1/workflows/:id/execute`. Pre-checks that the workflow is active and has a webhook/manual/form trigger. Most n8n builds don't expose this endpoint on the Public API and will 405; the tool surfaces a hint to switch to webhook mode.
 
-**`n8n_create_workflow`** — `POST /workflows`. Accepts the full output of `n8n_get_workflow` (with `includeDefinition=true`) directly. Strips read-only fields (`id`, `active`, `createdAt`, `updatedAt`, `isArchived`, `versionId`, `triggerCount`, `tags`, `shared`, `meta`, `pinData`) before POSTing — n8n enforces `additionalProperties: false` on the workflow schema and will 400 on any readOnly field. Runs `n8n_validate_workflow` on the proposed state as a pre-check; errors block, warnings pass through (pass `skipValidation: true` to bypass). No confirm gate — creation is non-destructive. The new workflow is created INACTIVE; call `n8n_activate` afterwards if you want triggers running. This is the primary restore path for `n8n_delete_workflow` snapshots: read the backup file into `definition` and call this tool. The restored workflow gets a new id.
+**`n8n_create_workflow`** - `POST /workflows`. Accepts the full output of `n8n_get_workflow` (with `includeDefinition=true`) directly. Strips read-only fields (`id`, `active`, `createdAt`, `updatedAt`, `isArchived`, `versionId`, `triggerCount`, `tags`, `shared`, `meta`, `pinData`) before POSTing - n8n enforces `additionalProperties: false` on the workflow schema and will 400 on any readOnly field. Runs `n8n_validate_workflow` on the proposed state as a pre-check; errors block, warnings pass through (pass `skipValidation: true` to bypass). No confirm gate - creation is non-destructive. The new workflow is created INACTIVE; call `n8n_activate` afterwards if you want triggers running. This is the primary restore path for `n8n_delete_workflow` snapshots: read the backup file into `definition` and call this tool. The restored workflow gets a new id.
 
-**`n8n_activate`** / **`n8n_deactivate`** — idempotent. Deactivating does not cancel running executions.
+**`n8n_activate`** / **`n8n_deactivate`** - idempotent. Deactivating does not cancel running executions.
 
-**`n8n_save_workflow`** — before writing: fetches the current version, snapshots it to `backupDir` as `<id>-<timestamp>.json` (mode 0600), runs `validateWorkflow` on the proposed state, and aborts on error-severity issues (pass `skipValidation: true` to bypass). Requires `confirm: true` to actually PUT; calling with `confirm: false` returns `ok: false` and never touches the API (omitting `confirm` is rejected at the MCP schema layer). Response includes the backup path and a `restoreHint`.
+**`n8n_save_workflow`** - before writing: fetches the current version, snapshots it to `backupDir` as `<id>-<timestamp>.json` (mode 0600), runs `validateWorkflow` on the proposed state, and aborts on error-severity issues (pass `skipValidation: true` to bypass). Requires `confirm: true` to actually PUT; calling with `confirm: false` returns `ok: false` and never touches the API (omitting `confirm` is rejected at the MCP schema layer). Response includes the backup path and a `restoreHint`.
 
-**`n8n_archive_workflow`** — `POST /workflows/{id}/archive`. Soft-deletes a workflow: triggers stop firing, the workflow disappears from the default UI list, but the definition and execution history are preserved. Idempotent (archiving an already-archived workflow returns the current state). No confirm gate — this is the safe cleanup path. Archiving deactivates as a side effect; the response surfaces `active: false` explicitly. Returns `ok: false` with `reason: "not_found"` on 404.
+**`n8n_archive_workflow`** - `POST /workflows/{id}/archive`. Soft-deletes a workflow: triggers stop firing, the workflow disappears from the default UI list, but the definition and execution history are preserved. Idempotent (archiving an already-archived workflow returns the current state). No confirm gate - this is the safe cleanup path. Archiving deactivates as a side effect; the response surfaces `active: false` explicitly. Returns `ok: false` with `reason: "not_found"` on 404.
 
-**`n8n_unarchive_workflow`** — `POST /workflows/{id}/unarchive`. Restores an archived workflow. Does NOT reactivate — triggers stay off until you call `n8n_activate` explicitly. Returns `ok: false` with `reason: "not_found"` on 404.
+**`n8n_unarchive_workflow`** - `POST /workflows/{id}/unarchive`. Restores an archived workflow. Does NOT reactivate - triggers stay off until you call `n8n_activate` explicitly. Returns `ok: false` with `reason: "not_found"` on 404.
 
-**`n8n_delete_workflow`** — `DELETE /workflows/{id}`. Permanent, irreversible. Before firing the DELETE: fetches the current workflow and snapshots it to `backupDir` as `<id>-DELETED-<timestamp>.json` (mode 0600). If the snapshot can't be written, the DELETE is aborted — there is no un-safety-netted path. Requires `confirm: true`; omitting it or passing `false` returns `ok: false` and never touches the API. Returns `ok: false` with `reason: "not_found"` on 404 (either before or after the snapshot). **Restore is one-call via `n8n_create_workflow`** with the snapshot contents; the restored workflow gets a new id and is created inactive. Deleting does NOT cancel running executions — use `n8n_list_executions(workflowId, status='running')` + `n8n_cancel_execution` first if needed. **Prefer `n8n_archive_workflow` for cleanup** if you want to preserve the original id.
+**`n8n_delete_workflow`** - `DELETE /workflows/{id}`. Permanent, irreversible. Before firing the DELETE: fetches the current workflow and snapshots it to `backupDir` as `<id>-DELETED-<timestamp>.json` (mode 0600). If the snapshot can't be written, the DELETE is aborted - there is no un-safety-netted path. Requires `confirm: true`; omitting it or passing `false` returns `ok: false` and never touches the API. Returns `ok: false` with `reason: "not_found"` on 404 (either before or after the snapshot). **Restore is one-call via `n8n_create_workflow`** with the snapshot contents; the restored workflow gets a new id and is created inactive. Deleting does NOT cancel running executions - use `n8n_list_executions(workflowId, status='running')` + `n8n_cancel_execution` first if needed. **Prefer `n8n_archive_workflow` for cleanup** if you want to preserve the original id.
 
-**`n8n_cancel_execution`** — `POST /executions/{id}/stop`. Closes the triage loop after `n8n_search_executions` locates a stuck run. Returns a success summary with the execution's final status, or `ok: false` with `reason: "not_found_or_finished"` if the id no longer matches a running execution (404).
+**`n8n_cancel_execution`** - `POST /executions/{id}/stop`. Closes the triage loop after `n8n_search_executions` locates a stuck run. Returns a success summary with the execution's final status, or `ok: false` with `reason: "not_found_or_finished"` if the id no longer matches a running execution (404).
 
-**`n8n_retry_execution`** — `POST /executions/{id}/retry`. Creates a NEW execution — the response surfaces both `originalExecutionId` and `newExecutionId` so agents can follow up with `n8n_get_execution` on the retry. Optional `loadWorkflow: true` retries against the currently saved workflow instead of the version captured at original execution time. Returns `ok: false` with `reason: "not_found"` on 404 or `reason: "not_retryable"` on 409 (e.g. still running); all other API errors rethrow.
+**`n8n_retry_execution`** - `POST /executions/{id}/retry`. Creates a NEW execution - the response surfaces both `originalExecutionId` and `newExecutionId` so agents can follow up with `n8n_get_execution` on the retry. Optional `loadWorkflow: true` retries against the currently saved workflow instead of the version captured at original execution time. Returns `ok: false` with `reason: "not_found"` on 404 or `reason: "not_retryable"` on 409 (e.g. still running); all other API errors rethrow.
 
-**`n8n_delete_execution`** — `DELETE /executions/{id}`. Permanently removes an execution record: logs, per-node run data, and error payloads are erased from n8n. Requires `confirm: true` to actually delete; calling with `confirm: false` returns `ok: false` and never touches the API (omitting `confirm` is rejected at the MCP schema layer). Returns `ok: false` with `reason: "not_found"` on 404; all other API errors rethrow. Not idempotent from an agent's perspective: the record is gone after the first successful call, so fetch `n8n_get_execution` first if you may need it later.
+**`n8n_delete_execution`** - `DELETE /executions/{id}`. Permanently removes an execution record: logs, per-node run data, and error payloads are erased from n8n. Requires `confirm: true` to actually delete; calling with `confirm: false` returns `ok: false` and never touches the API (omitting `confirm` is rejected at the MCP schema layer). Returns `ok: false` with `reason: "not_found"` on 404; all other API errors rethrow. Not idempotent from an agent's perspective: the record is gone after the first successful call, so fetch `n8n_get_execution` first if you may need it later.
 
-**`n8n_delete_executions`** — batch form. Client-side fan-out over `DELETE /executions/{id}` with bounded concurrency (default 3, max 10). Takes an `ids` array (deduped before fan-out, capped at 50), requires `confirm: true`. Response surfaces `requested`/`attempted`/`deleted`/`alreadyDeleted`/`failed`/`skipped`/`aborted` counters plus a `results: Array<{id, ok, reason?, message?}>` — order is completion order, not input order, so look up by id. 404 per id is treated as `already_deleted` (idempotent). A 5xx on any id aborts the batch via an `AbortController`: no new ids are claimed and any already-in-flight `fetch`es are cancelled client-side. Under concurrency N, up to N-1 deletes may have already reached the server before the 5xx is observed, so the batch is best-effort, not transactional — clear signal the server is sick; don't retry blindly. Per-id error messages are passed through the API-key redactor. Compose with `n8n_search_executions` to purge a known set of noisy runs in one call.
+**`n8n_delete_executions`** - batch form. Client-side fan-out over `DELETE /executions/{id}` with bounded concurrency (default 3, max 10). Takes an `ids` array (deduped before fan-out, capped at 50), requires `confirm: true`. Response surfaces `requested`/`attempted`/`deleted`/`alreadyDeleted`/`failed`/`skipped`/`aborted` counters plus a `results: Array<{id, ok, reason?, message?}>` - order is completion order, not input order, so look up by id. 404 per id is treated as `already_deleted` (idempotent). A 5xx on any id aborts the batch via an `AbortController`: no new ids are claimed and any already-in-flight `fetch`es are cancelled client-side. Under concurrency N, up to N-1 deletes may have already reached the server before the 5xx is observed, so the batch is best-effort, not transactional - clear signal the server is sick; don't retry blindly. Per-id error messages are passed through the API-key redactor. Compose with `n8n_search_executions` to purge a known set of noisy runs in one call.
 
 </details>
 
@@ -95,12 +95,30 @@ Generate an API key in n8n under **Settings → API**, then set these env vars i
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `N8N_BASE_URL` | yes | — | n8n base URL, e.g. `http://localhost:5678` |
-| `N8N_API_KEY` | yes | — | n8n Public API key (`X-N8N-API-KEY`) |
+| `N8N_BASE_URL` | yes | - | n8n base URL, e.g. `http://localhost:5678` |
+| `N8N_API_KEY` | yes | - | n8n Public API key (`X-N8N-API-KEY`) |
 | `N8N_ENABLE_EDIT` | no | `false` | Expose write tools |
 | `N8N_BACKUP_DIR` | no | `~/.n8n-backups` | Where `n8n_save_workflow` writes pre-save snapshots |
 | `N8N_MAX_EXECUTION_LOG_BYTES` | no | `65536` | Cap on inline execution log bytes |
 | `N8N_REQUEST_TIMEOUT_MS` | no | `15000` | HTTP timeout for n8n API calls |
+
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "n8n": {
+      "command": "n8n-ops-mcp",
+      "env": {
+        "N8N_BASE_URL": "http://localhost:5678",
+        "N8N_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
 
 ### Claude Code
 
@@ -113,9 +131,46 @@ claude mcp add n8n \
 
 Add `--scope user` to make it available from any directory instead of only the current project.
 
-### OpenClaw
+### Codex CLI
 
-n8n-ops-mcp is a first-class OpenClaw plugin — not an MCP bridge — so it shares the gateway's process, auth profiles, and hooks.
+```bash
+codex mcp add n8n \
+  --env N8N_BASE_URL=http://localhost:5678 \
+  --env N8N_API_KEY=your-api-key-here \
+  -- n8n-ops-mcp
+```
+
+Writes the entry to `~/.codex/config.toml` under `[mcp_servers.n8n]`. Verify with `codex mcp list`.
+
+### Cursor / Windsurf / other MCP hosts
+
+Any MCP-compatible client that accepts a stdio command + env will work. Point it at the `n8n-ops-mcp` binary with `N8N_BASE_URL` and `N8N_API_KEY` in the environment.
+
+<details>
+<summary><b>Hermes Agent</b></summary>
+
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) reads MCP config from `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  n8n:
+    command: "n8n-ops-mcp"
+    env:
+      N8N_BASE_URL: "http://localhost:5678"
+      N8N_API_KEY: "your-api-key-here"
+```
+
+Then reload from inside a session:
+
+```
+/reload-mcp
+```
+
+</details>
+
+### OpenClaw (first-class plugin)
+
+n8n-ops-mcp was built for OpenClaw and ships as a first-class plugin - not an MCP bridge - so it shares the gateway's process, auth profiles, and hooks.
 
 ```bash
 openclaw plugins install clawhub:n8n-ops-mcp
@@ -155,57 +210,7 @@ systemctl --user restart openclaw-gateway
 Config keys: `baseUrl`, `apiKey`, `apiKeyEnv`, `enableEdit`, `maxExecutionLogBytes`, `requestTimeoutMs`, `backupDir`. See [`openclaw.plugin.json`](./openclaw.plugin.json) for the full schema.
 
 <details>
-<summary><b>Other clients</b> — Claude Desktop, Hermes Agent, Codex CLI, manual OpenClaw install</summary>
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "n8n": {
-      "command": "n8n-ops-mcp",
-      "env": {
-        "N8N_BASE_URL": "http://localhost:5678",
-        "N8N_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
-
-### Hermes Agent
-
-[Hermes Agent](https://github.com/NousResearch/hermes-agent) reads MCP config from `~/.hermes/config.yaml`:
-
-```yaml
-mcp_servers:
-  n8n:
-    command: "n8n-ops-mcp"
-    env:
-      N8N_BASE_URL: "http://localhost:5678"
-      N8N_API_KEY: "your-api-key-here"
-```
-
-Then reload from inside a session:
-
-```
-/reload-mcp
-```
-
-### Codex CLI
-
-```bash
-codex mcp add n8n \
-  --env N8N_BASE_URL=http://localhost:5678 \
-  --env N8N_API_KEY=your-api-key-here \
-  -- n8n-ops-mcp
-```
-
-Writes the entry to `~/.codex/config.toml` under `[mcp_servers.n8n]`. Verify with `codex mcp list`.
-
-### OpenClaw — manual (non-ClawHub) install
+<summary><b>OpenClaw - manual (non-ClawHub) install</b></summary>
 
 If you want to point OpenClaw at a local clone instead of the registry:
 
@@ -265,15 +270,15 @@ Calls `n8n_search_executions` to find the failed id, then `n8n_retry_execution` 
 
 Calls `n8n_search_executions` to find the ids, then `n8n_delete_executions` with `confirm: true` to purge up to 50 in one call. Deletion is irreversible.
 
-> Archive the old "staging-bot" workflow — I might need it back someday *(requires `N8N_ENABLE_EDIT=true`)*
+> Archive the old "staging-bot" workflow - I might need it back someday *(requires `N8N_ENABLE_EDIT=true`)*
 
 Calls `n8n_list_workflows` with a name filter, then `n8n_archive_workflow` on the match. Reversible via `n8n_unarchive_workflow` (you'll still need `n8n_activate` to turn triggers back on).
 
-> Delete the abandoned "poc-scraper" workflow — it's been dead for months *(requires `N8N_ENABLE_EDIT=true`)*
+> Delete the abandoned "poc-scraper" workflow - it's been dead for months *(requires `N8N_ENABLE_EDIT=true`)*
 
 Calls `n8n_list_workflows` to find the id, then `n8n_delete_workflow` with `confirm: true`. A snapshot lands in `backupDir` first; restore is one-call via `n8n_create_workflow` with the snapshot. Prefer `n8n_archive_workflow` if you want to preserve the original id.
 
-> Restore the workflow I accidentally deleted yesterday — backup is at `~/.n8n-backups/wf-42-DELETED-2026-04-22_15-00-00.json` *(requires `N8N_ENABLE_EDIT=true`)*
+> Restore the workflow I accidentally deleted yesterday - backup is at `~/.n8n-backups/wf-42-DELETED-2026-04-22_15-00-00.json` *(requires `N8N_ENABLE_EDIT=true`)*
 
 Reads the backup file, calls `n8n_create_workflow` with `definition=<backup contents>`. Read-only fields are stripped automatically; the restored workflow gets a new id and starts inactive. Call `n8n_activate` on the new id to re-enable triggers.
 
@@ -300,6 +305,10 @@ cd n8n-ops-mcp
 npm install
 npm run build
 ```
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
 
 ## License
 
