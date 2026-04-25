@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-04-25
+
+### Added
+- `n8n_audit_browser_bridge_usage` - read-only scanner that walks every workflow and surfaces nodes calling the [`browser-bridge`](https://github.com/solomonneas/browser-bridge) CLI (Execute Command, Code, SSH, legacy Function). Returns one finding per `(workflowId, nodeName, platform, action)` plus a per-platform action summary. Optional filters: `platform`, `action`, `activeOnly`, `includeArchived`. Paginates via cursor up to `maxWorkflows` (default 250, max 1000) with bounded-concurrency `getWorkflow` fan-out (default 3, max 8). Per-workflow fetch failures land in `fetchErrors` instead of failing the whole audit. Detection regex requires the `.js` / `.cjs` / `.mjs` extension to avoid false positives from path mentions like `cd /opt/browser-bridge`.
+- `n8n_scaffold_browser_bridge_node` - pure local generator (no n8n API call) that emits a ready-to-paste n8n node calling `browser-bridge <platform> <action>`. Two modes: `code-node` (default; `spawnSync` with stdin JSON, surfaces `exitCode` + `stderr`) and `execute-command` (quoted `<<'JSON'` heredoc). Mirrors the patterns in browser-bridge's `docs/n8n-usage.md`. Validates `platform` and `action` as kebab slugs to keep them safe to interpolate into shell commands. Warns when `execute-command` mode is paired with non-empty `input` (heredoc bakes input in; no per-item wiring).
+
+### Notes
+- Companion repo: [browser-bridge](https://github.com/solomonneas/browser-bridge). The two new tools are the first n8n-ops-mcp pieces designed to compose with browser-bridge end-to-end (find existing calls, then scaffold new ones).
+
 ## [0.8.1] - 2026-04-24
 
 ### Changed
@@ -72,6 +81,7 @@ No behavior changes. Docs and metadata only.
 - MCP stdio wrapper so the plugin runs in any MCP-compatible client (Claude Desktop, Claude Code, Codex CLI, Hermes Agent).
 - Built as a first-class OpenClaw plugin (shared gateway process, auth profiles, hooks).
 
+[0.9.0]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.9.0
 [0.8.1]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.8.1
 [0.8.0]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.8.0
 [0.7.0]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.7.0

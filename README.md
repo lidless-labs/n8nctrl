@@ -26,6 +26,8 @@ For a catalog/docs tool that indexes n8n's node library, see [n8n-mcp](https://w
 | `n8n_list_webhooks` | Enumerate webhook + form-trigger URLs | |
 | `n8n_validate_workflow` | Static checks: deprecated nodes, legacy Code-node API, orphans | |
 | `n8n_trigger` | Run a workflow via webhook (reliable) or workflow-id | |
+| `n8n_audit_browser_bridge_usage` | Find every workflow that calls the [`browser-bridge`](https://github.com/solomonneas/browser-bridge) CLI (Execute Command, Code, SSH nodes) | |
+| `n8n_scaffold_browser_bridge_node` | Generate a ready-to-paste n8n node that calls a `browser-bridge <platform> <action>` (no API call) | |
 | `n8n_create_workflow` | Create a workflow (accepts `n8n_get_workflow` output directly; primary restore path) | ✓ |
 | `n8n_activate` | Enable a workflow's triggers | ✓ |
 | `n8n_deactivate` | Disable a workflow's triggers | ✓ |
@@ -56,6 +58,10 @@ Write tools are hidden unless `N8N_ENABLE_EDIT=true`.
 **`n8n_list_webhooks`** - scans workflows for webhook and form-trigger nodes and returns their paths + fully-formed `triggerUrl`. Pairs with `n8n_trigger` mode='webhook'. Optional `workflowId`, `activeOnly` (default true), `limit` (default 50).
 
 **`n8n_validate_workflow`** - checks for deprecated node types (function → code), legacy Code-node API (`$node[]`, `items` global, `require()`), orphan nodes, disabled nodes, missing trigger. Returns issues with severity (error/warning/info) plus a summary count.
+
+**`n8n_audit_browser_bridge_usage`** - scans every workflow for nodes that invoke the `browser-bridge` CLI. Inspects `command` (Execute Command + SSH nodes) and `jsCode` / `pythonCode` / `functionCode` (Code + legacy Function nodes). Heuristic: `\bbrowser-bridge\.[cm]?js` followed by two kebab-slug args; the bare bin form is intentionally not detected to avoid false positives from path mentions like `cd /opt/browser-bridge`. Returns one finding per `(workflowId, nodeName, platform, action)` plus a `summary` of platform×action counts. Optional `platform`, `action`, `activeOnly` (default false), `includeArchived` (default false), `maxWorkflows` (default 250, max 1000), `concurrency` (default 3, max 8). Read-only. Pairs with `n8n_scaffold_browser_bridge_node` when you need to add another call. Companion repo: [browser-bridge](https://github.com/solomonneas/browser-bridge).
+
+**`n8n_scaffold_browser_bridge_node`** - pure local generator (no n8n API call). Given `platform`, `action`, optional `input` JSON, and `mode: "code-node" | "execute-command"` (default `code-node`), emits a ready-to-paste n8n node JSON that mirrors `browser-bridge`'s `docs/n8n-usage.md` patterns. The Code node uses `spawnSync` with stdin JSON and surfaces `payload.exitCode` + `stderr` so downstream nodes can branch on `ok`. The Execute Command node uses a quoted `<<'JSON'` heredoc so the input passes through unmangled. Optional `bridgeDir` (default `/home/user/.openclaw/workspace/pipeline/work/browser-bridge`), `nodeName`, `position`. Platform/action are validated as kebab slugs - keeps them safe to interpolate into the shell command. Warns when `execute-command` is used with non-empty `input` (heredoc bakes the JSON in; no per-item upstream wiring).
 
 **`n8n_trigger`** - two modes:
 - `mode: "webhook"` + `webhookPath` - POST (or GET/PUT/DELETE) to the configured base URL + path, with an optional JSON `payload`. This is the reliable path.
@@ -249,6 +255,14 @@ Calls `n8n_search_executions` with `query: "ECONNREFUSED"`.
 > Trigger the "nightly intel" workflow
 
 Calls `n8n_list_webhooks` to find the path, then `n8n_trigger` with `mode=webhook`.
+
+> Where am I calling Linktree sync from?
+
+Calls `n8n_audit_browser_bridge_usage` with `platform: "linktree"` to list every node (across all workflows) that invokes `browser-bridge linktree <action>`.
+
+> Add a CoderLegion `scan-comments` step to a new workflow
+
+Calls `n8n_scaffold_browser_bridge_node` with `platform: "coderlegion"`, `action: "scan-comments"`, `input: {limit: 5}` to get a Code node JSON, then pastes it into n8n.
 
 > Audit my workflows for deprecated Code-node API usage
 

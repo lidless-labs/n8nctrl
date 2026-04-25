@@ -22,6 +22,8 @@ import {
 } from "./src/tools/archive-workflow.ts";
 import { createDeleteWorkflowTool } from "./src/tools/delete-workflow.ts";
 import { createCreateWorkflowTool } from "./src/tools/create-workflow.ts";
+import { createAuditBrowserBridgeUsageTool } from "./src/tools/audit-browser-bridge-usage.ts";
+import { createScaffoldBrowserBridgeNodeTool } from "./src/tools/scaffold-browser-bridge-node.ts";
 
 export default definePluginEntry({
   id: "n8n",
@@ -49,6 +51,12 @@ export default definePluginEntry({
       createListWebhooksTool({ getClient, baseUrl: config.baseUrl }) as AnyAgentTool,
     );
     api.registerTool(createValidateWorkflowTool(getClient) as AnyAgentTool);
+    api.registerTool(
+      createAuditBrowserBridgeUsageTool(getClient) as AnyAgentTool,
+    );
+    api.registerTool(
+      createScaffoldBrowserBridgeNodeTool() as AnyAgentTool,
+    );
 
     if (config.enableEdit) {
       api.registerTool(createActivateTool(getClient) as AnyAgentTool);

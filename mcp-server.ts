@@ -28,8 +28,10 @@ import {
 } from "./src/tools/archive-workflow.ts";
 import { createDeleteWorkflowTool } from "./src/tools/delete-workflow.ts";
 import { createCreateWorkflowTool } from "./src/tools/create-workflow.ts";
+import { createAuditBrowserBridgeUsageTool } from "./src/tools/audit-browser-bridge-usage.ts";
+import { createScaffoldBrowserBridgeNodeTool } from "./src/tools/scaffold-browser-bridge-node.ts";
 
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
 
 function readConfigFromEnv(): N8nPluginConfig {
   const baseUrl = (process.env.N8N_BASE_URL ?? "").trim();
@@ -244,6 +246,82 @@ async function main(): Promise<void> {
 
   bind(server, createValidateWorkflowTool(getClient), {
     id: z.string().describe("Workflow id (from n8n_list_workflows)."),
+  });
+
+  bind(server, createAuditBrowserBridgeUsageTool(getClient), {
+    platform: z
+      .string()
+      .optional()
+      .describe(
+        "Filter findings to a single browser-bridge platform (e.g. 'coderlegion').",
+      ),
+    action: z
+      .string()
+      .optional()
+      .describe(
+        "Filter findings to a single browser-bridge action (e.g. 'scan-comments').",
+      ),
+    activeOnly: z
+      .boolean()
+      .optional()
+      .describe(
+        "Only scan active workflows. Default false - inactive workflows often hide stale browser-bridge calls.",
+      ),
+    includeArchived: z
+      .boolean()
+      .optional()
+      .describe("Include archived workflows in the scan. Default false."),
+    maxWorkflows: z
+      .number()
+      .int()
+      .min(1)
+      .max(1000)
+      .optional()
+      .describe("Cap on workflows fetched and inspected (default 250)."),
+    concurrency: z
+      .number()
+      .int()
+      .min(1)
+      .max(8)
+      .optional()
+      .describe("Parallel getWorkflow requests (default 3, max 8)."),
+  });
+
+  bind(server, createScaffoldBrowserBridgeNodeTool(), {
+    platform: z
+      .string()
+      .min(1)
+      .describe("Browser-bridge platform slug (e.g. 'coderlegion')."),
+    action: z
+      .string()
+      .min(1)
+      .describe("Browser-bridge action (e.g. 'scan-comments', 'draft-post')."),
+    input: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("JSON input passed on stdin to the browser-bridge call."),
+    mode: z
+      .enum(["execute-command", "code-node"])
+      .optional()
+      .describe(
+        "Which n8n node shape to emit. 'code-node' (default) handles JSON I/O via spawnSync. 'execute-command' is a heredoc shell call.",
+      ),
+    bridgeDir: z
+      .string()
+      .optional()
+      .describe(
+        "Absolute path to the browser-bridge checkout on the n8n host. Default matches docs/n8n-usage.md.",
+      ),
+    nodeName: z
+      .string()
+      .optional()
+      .describe(
+        "Override the generated node name. Default 'Browser Bridge: <platform> <action>'.",
+      ),
+    position: z
+      .tuple([z.number(), z.number()])
+      .optional()
+      .describe("n8n canvas position [x, y]. Default [0, 0]."),
   });
 
   if (config.enableEdit) {
