@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-04-25
+
+### Added
+- `n8n_diff_workflow` - read-only semantic diff between a workflow's current state and a snapshot. Inputs: `id` plus exactly one of `snapshotPath` (absolute file path; `~` resolved) or `snapshot` (inline object). Snapshot accepts both shapes: flat (`n8n_save_workflow` / `n8n_delete_workflow` backup) and nested (`n8n_get_workflow(includeDefinition=true)`). Returns counters in `summary` (added/removed/modified/nameChanged/connectionsChanged/settingsChanged) plus a `diff` payload with per-node `fieldsChanged` paths walking one level into `parameters` (e.g. `parameters.command`, `parameters.url`). Node matching is two-pass: id-first, name-fallback — handles legacy/hand-edited snapshots without forcing a "1 added + 1 removed" false signal. Cosmetic-only changes (`position`, `webhookId`) suppressed by default; toggle with `ignoreCosmetic: false`. Per-node detail capped at `maxModifiedDetails` (default 50, max 500) with an explicit `nodesModifiedTruncated` flag; `summary` counters are uncapped.
+
+### Notes
+- Closes the snapshot/restore loop opened in 0.7/0.8: you could save and restore but had no way to see what changed between them. Pairs with `n8n_save_workflow` (which writes the snapshot) and `n8n_audit_browser_bridge_usage` (which surfaces calls — diff tells you whether they've drifted).
+
 ## [0.9.0] - 2026-04-25
 
 ### Added
@@ -81,6 +89,7 @@ No behavior changes. Docs and metadata only.
 - MCP stdio wrapper so the plugin runs in any MCP-compatible client (Claude Desktop, Claude Code, Codex CLI, Hermes Agent).
 - Built as a first-class OpenClaw plugin (shared gateway process, auth profiles, hooks).
 
+[0.10.0]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.10.0
 [0.9.0]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.9.0
 [0.8.1]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.8.1
 [0.8.0]: https://github.com/solomonneas/n8n-ops-mcp/releases/tag/v0.8.0

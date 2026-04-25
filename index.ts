@@ -24,6 +24,7 @@ import { createDeleteWorkflowTool } from "./src/tools/delete-workflow.ts";
 import { createCreateWorkflowTool } from "./src/tools/create-workflow.ts";
 import { createAuditBrowserBridgeUsageTool } from "./src/tools/audit-browser-bridge-usage.ts";
 import { createScaffoldBrowserBridgeNodeTool } from "./src/tools/scaffold-browser-bridge-node.ts";
+import { createDiffWorkflowTool } from "./src/tools/diff-workflow.ts";
 
 export default definePluginEntry({
   id: "n8n",
@@ -57,6 +58,7 @@ export default definePluginEntry({
     api.registerTool(
       createScaffoldBrowserBridgeNodeTool() as AnyAgentTool,
     );
+    api.registerTool(createDiffWorkflowTool(getClient) as AnyAgentTool);
 
     if (config.enableEdit) {
       api.registerTool(createActivateTool(getClient) as AnyAgentTool);

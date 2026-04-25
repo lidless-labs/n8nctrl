@@ -30,8 +30,9 @@ import { createDeleteWorkflowTool } from "./src/tools/delete-workflow.ts";
 import { createCreateWorkflowTool } from "./src/tools/create-workflow.ts";
 import { createAuditBrowserBridgeUsageTool } from "./src/tools/audit-browser-bridge-usage.ts";
 import { createScaffoldBrowserBridgeNodeTool } from "./src/tools/scaffold-browser-bridge-node.ts";
+import { createDiffWorkflowTool } from "./src/tools/diff-workflow.ts";
 
-const VERSION = "0.9.0";
+const VERSION = "0.10.0";
 
 function readConfigFromEnv(): N8nPluginConfig {
   const baseUrl = (process.env.N8N_BASE_URL ?? "").trim();
@@ -322,6 +323,37 @@ async function main(): Promise<void> {
       .tuple([z.number(), z.number()])
       .optional()
       .describe("n8n canvas position [x, y]. Default [0, 0]."),
+  });
+
+  bind(server, createDiffWorkflowTool(getClient), {
+    id: z.string().describe("Workflow id to fetch as the 'after' side of the diff."),
+    snapshotPath: z
+      .string()
+      .optional()
+      .describe(
+        "Absolute path to a JSON snapshot file (e.g. n8n_save_workflow backup). `~` is resolved. Use this OR `snapshot`.",
+      ),
+    snapshot: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        "Inline snapshot object — accepts the flat backup shape OR the nested n8n_get_workflow(includeDefinition=true) shape. Use this OR `snapshotPath`.",
+      ),
+    ignoreCosmetic: z
+      .boolean()
+      .optional()
+      .describe(
+        "Suppress position-only and webhookId-only node changes (default true).",
+      ),
+    maxModifiedDetails: z
+      .number()
+      .int()
+      .min(1)
+      .max(500)
+      .optional()
+      .describe(
+        "Cap on per-node modification entries returned in `diff.nodesModified` (default 50). Counters in `summary` are NOT capped.",
+      ),
   });
 
   if (config.enableEdit) {
