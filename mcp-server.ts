@@ -323,7 +323,8 @@ async function main(): Promise<void> {
         "Override the generated node name. Default 'Browser Bridge: <platform> <action>'.",
       ),
     position: z
-      .tuple([z.number(), z.number()])
+      .array(z.number())
+      .length(2)
       .optional()
       .describe("n8n canvas position [x, y]. Default [0, 0]."),
   });

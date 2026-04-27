@@ -12,6 +12,20 @@ async function run(
 }
 
 describe("n8n_scaffold_browser_bridge_node", () => {
+  it("uses an OpenAI-compatible fixed-length array schema for position", () => {
+    const tool = createScaffoldBrowserBridgeNodeTool();
+    const positionSchema = (
+      tool.parameters as {
+        properties: { position: { items: unknown; minItems: number; maxItems: number } };
+      }
+    ).properties.position;
+
+    expect(Array.isArray(positionSchema.items)).toBe(false);
+    expect(positionSchema.items).toMatchObject({ type: "number" });
+    expect(positionSchema.minItems).toBe(2);
+    expect(positionSchema.maxItems).toBe(2);
+  });
+
   it("emits a code-node by default with spawnSync wrapping the requested platform/action", async () => {
     const details = await run({
       platform: "coderlegion",

@@ -40,7 +40,9 @@ const Schema = Type.Object(
       }),
     ),
     position: Type.Optional(
-      Type.Tuple([Type.Number(), Type.Number()], {
+      Type.Array(Type.Number(), {
+        minItems: 2,
+        maxItems: 2,
         description: "n8n canvas position [x, y]. Default [0, 0].",
       }),
     ),
