@@ -1,6 +1,11 @@
 # Repository Guidance
 
 ## Definition of Done
+```
+./scripts/verify
+```
+Runs `npm test`, `npm run typecheck`, and `npm run build` in order.
+
 A change is done only when all three pass, re-verified after your last edit:
 - `npm test`
 - `npm run typecheck`

@@ -1,0 +1,10 @@
+#!/bin/bash
+# Single verification entrypoint. AGENTS.md's Definition of Done defers to
+# this file, so the gate lives in exactly one place.
+# Tests use mocked fetch helpers; nothing here touches the live n8n instance.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+npm test
+npm run typecheck
+npm run build
