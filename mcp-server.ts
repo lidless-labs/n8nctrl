@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -128,8 +130,7 @@ function bind<Shape extends z.ZodRawShape>(
   server.tool(tool.name, tool.description, shape, handler as never);
 }
 
-async function main(): Promise<void> {
-  const config = readConfigFromEnv();
+export function buildServer(config: N8nPluginConfig): McpServer {
   const getClient = lazyClient(config);
 
   const server = new McpServer({
@@ -907,6 +908,13 @@ async function main(): Promise<void> {
     }
   }
 
+  return server;
+}
+
+export async function serve(): Promise<void> {
+  const config = readConfigFromEnv();
+  const server = buildServer(config);
+
   const transport = new StdioServerTransport();
   // Strip the draft-07 `$schema` the MCP SDK stamps on tool schemas; Anthropic
   // rejects it ("must match JSON Schema draft 2020-12") when the full tool set
@@ -925,8 +933,22 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  console.error(`n8n-ops-mcp fatal: ${msg}`);
-  process.exit(1);
-});
+// True when this module is the process entrypoint. process.argv[1] is often a
+// symlink (npm installs the bin as a link); resolve it before comparing.
+const isEntrypoint = (() => {
+  const arg = process.argv[1];
+  if (typeof arg !== "string") return false;
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(arg)).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (isEntrypoint) {
+  serve().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`n8n-ops-mcp fatal: ${msg}`);
+    process.exit(1);
+  });
+}
