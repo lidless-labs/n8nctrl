@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/n8nctrl-banner.jpg" alt="n8nctrl banner" width="900">
+  <img src="docs/assets/n8nctrl-social-preview.jpg" alt="n8nctrl banner" width="900">
 </p>
 
 <h1 align="center">n8nctrl</h1>
@@ -13,10 +13,9 @@
 </p>
 
 <p align="center">
-  <img src="https://shieldcn.dev/npm/n8n-ops-mcp.svg" alt="npm version">
-  <img src="https://shieldcn.dev/github/ci/lidless-labs/n8nctrl.svg?branch=main&workflow=ci.yml" alt="ci">
-  <img src="https://shieldcn.dev/badge/MCP-server-8A2BE2.svg" alt="MCP server">
-  <img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="license">
+  <img src="https://shieldcn.dev/github/ci/lidless-labs/n8nctrl.svg?branch=main&workflow=ci.yml" alt="CI">
+  <img src="https://shieldcn.dev/npm/v/n8n-ops-mcp.svg" alt="npm version">
+  <img src="https://shieldcn.dev/github/license/lidless-labs/n8nctrl.svg" alt="license">
 </p>
 
 **n8nctrl is an operator control CLI for [n8n](https://n8n.io) workflow automation.** It lists, inspects, validates, audits, and reports on your n8n workflows and executions over the n8n Public API, so you can ask "what broke in my n8n today?" and act on the answer from a terminal, cron, CI, or an agent. Unlike catalog/docs tools that index n8n's node library for building flows, n8nctrl is built for operating the flows you already run: triage failed executions, find drift, scan for security risks, and inspect live schedules, webhooks, credentials metadata, and tags.
