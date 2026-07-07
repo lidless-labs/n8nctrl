@@ -1,6 +1,6 @@
 {
   "name": "n8n-ops-mcp",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "n8nctrl operator control CLI for n8n workflow ops, with MCP and OpenClaw adapters for agents.",
   "type": "module",
   "license": "MIT",
@@ -18,7 +18,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/lidless-labs/n8nctrl.git"
+    "url": "git+https://github.com/lidless-labs/n8nctrl.git"
   },
   "homepage": "https://github.com/lidless-labs/n8nctrl#readme",
   "bugs": {
@@ -28,10 +28,10 @@
     "node": ">=20.0.0"
   },
   "bin": {
-    "n8nctrl": "./dist/cli.js",
-    "n8nctl": "./dist/cli.js",
-    "n8n-ops": "./dist/cli.js",
-    "n8n-ops-mcp": "./dist/mcp-bin.js"
+    "n8nctrl": "dist/cli.js",
+    "n8nctl": "dist/cli.js",
+    "n8n-ops": "dist/cli.js",
+    "n8n-ops-mcp": "dist/mcp-bin.js"
   },
   "main": "dist/mcp-server.js",
   "files": [
