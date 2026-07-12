@@ -185,6 +185,28 @@ describe("n8n_delete_workflow", () => {
     expect(files).toHaveLength(1);
   });
 
+  it("redacts upstream delete errors before returning the tool result", async () => {
+    const secret = "delete-secret-token";
+    const current = baseWorkflow();
+    const getWorkflow = vi.fn().mockResolvedValue(current);
+    const deleteWorkflow = vi
+      .fn()
+      .mockRejectedValue(new Error(`n8n 500 body ${secret}`));
+    const client = makeFakeClient({
+      getWorkflow,
+      deleteWorkflow,
+      redact: vi.fn((text: string) => text.split(secret).join("***REDACTED***")),
+    });
+    const tool = buildTool(client, backupDir);
+
+    const details = await run(tool, { id: "wf-42", confirm: true });
+
+    expect(details.ok).toBe(false);
+    expect(details.error).toBe("delete failed: n8n 500 body ***REDACTED***");
+    expect(String(details.error)).not.toContain(secret);
+    expect(client.redact).toHaveBeenCalledWith(`n8n 500 body ${secret}`);
+  });
+
   it("aborts before DELETE if the backup write fails", async () => {
     // Point backupDir at a path that cannot be created (file-at-parent).
     const blockingFile = path.join(backupDir, "blocker");

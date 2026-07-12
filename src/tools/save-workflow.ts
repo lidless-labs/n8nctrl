@@ -103,7 +103,7 @@ export function createSaveWorkflowTool(deps: SaveWorkflowDeps) {
           restoreHint: `To restore: n8n_save_workflow with id=${saved.id}, confirm=true, definition=<contents of ${backupPath}>.`,
         });
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = client.redact(err instanceof Error ? err.message : String(err));
         return jsonToolResult({
           ok: false,
           error: `save failed: ${msg}`,

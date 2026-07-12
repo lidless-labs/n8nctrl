@@ -1,0 +1,68 @@
+{
+  "kicker": "N8NCTRL · OPS LOOP",
+  "title": "find the broken workflow, then act safely",
+  "subtitle": "Read tools inspect executions and workflow state first. Write tools stay hidden until the edit gate is enabled, and every risky action still needs confirmation.",
+  "footer": "read first · gate writes · snapshot before change",
+  "lanes": [
+    { "id": "question", "label": "QUESTION" },
+    { "id": "read", "label": "READ TOOLS" },
+    { "id": "gate", "label": "GATE" },
+    { "id": "write", "label": "ACTION" }
+  ],
+  "nodes": [
+    {
+      "id": "ask",
+      "lane": "question",
+      "row": 0,
+      "title": "what broke today?",
+      "meta": "agent or operator prompt",
+      "status": "source"
+    },
+    {
+      "id": "executions",
+      "lane": "read",
+      "row": 0,
+      "title": "list executions",
+      "meta": "error, running, waiting"
+    },
+    {
+      "id": "inspect",
+      "lane": "read",
+      "row": 1,
+      "title": "inspect workflow",
+      "meta": "nodes, schedules, webhooks"
+    },
+    {
+      "id": "editGate",
+      "lane": "gate",
+      "row": 0,
+      "title": "N8N_ENABLE_EDIT",
+      "meta": "writes hidden by default",
+      "status": "gate"
+    },
+    {
+      "id": "snapshot",
+      "lane": "gate",
+      "row": 1,
+      "title": "snapshot first",
+      "meta": "backup before save/delete",
+      "status": "gate"
+    },
+    {
+      "id": "act",
+      "lane": "write",
+      "row": 0,
+      "title": "confirm action",
+      "meta": "trigger, save, archive, retry",
+      "status": "focus"
+    }
+  ],
+  "edges": [
+    { "from": "ask", "to": "executions" },
+    { "from": "executions", "to": "inspect" },
+    { "from": "executions", "to": "editGate" },
+    { "from": "inspect", "to": "editGate" },
+    { "from": "editGate", "to": "snapshot" },
+    { "from": "snapshot", "to": "act" }
+  ]
+}

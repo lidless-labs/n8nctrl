@@ -222,6 +222,31 @@ describe("n8n_save_workflow", () => {
     expect(files).toHaveLength(1);
   });
 
+  it("redacts upstream save errors before returning the tool result", async () => {
+    const secret = "upstream-secret-token";
+    const current = baseWorkflow();
+    const client = makeFakeClient({
+      getWorkflow: vi.fn().mockResolvedValue(current),
+      saveWorkflow: vi.fn().mockRejectedValue(new Error(`n8n 500 body ${secret}`)),
+      redact: vi.fn((text: string) => text.split(secret).join("***REDACTED***")),
+    });
+    const tool = buildTool(client, backupDir);
+
+    const res = await run(tool, {
+      id: "wf-42",
+      definition: {
+        nodes: current.nodes,
+        connections: {},
+      },
+      confirm: true,
+    });
+
+    expect(res.details.ok).toBe(false);
+    expect(res.details.error).toBe("save failed: n8n 500 body ***REDACTED***");
+    expect(res.details.error).not.toContain(secret);
+    expect(client.redact).toHaveBeenCalledWith(`n8n 500 body ${secret}`);
+  });
+
   it("only passes editable fields through to saveWorkflow (no read-only fields)", async () => {
     const current = baseWorkflow({
       staticData: { counter: 7 },

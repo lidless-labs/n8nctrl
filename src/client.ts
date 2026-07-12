@@ -1,3 +1,17 @@
+import { Effect } from "effect";
+import {
+  buildUrl,
+  noRetry,
+  sendRequest,
+  UnexpectedStatusError,
+  withRetry,
+  type AuthStrategy,
+  type HttpContext,
+  type HttpMethod,
+  type HttpRequest,
+  type OperatorError,
+} from "@lidless-labs/effect-operator-kit";
+
 export interface N8nClientOptions {
   baseUrl: string;
   apiKey: string;
@@ -654,51 +668,161 @@ export class N8nClient {
     path: string,
     init: RequestInit = {},
   ): Promise<T> {
-    const url = `${this.baseUrl}${path}`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const caller = init.signal as AbortSignal | null | undefined;
-    let onCallerAbort: (() => void) | undefined;
-    if (caller) {
-      if (caller.aborted) controller.abort();
+    const { signal: _drop, headers: initHeaders, body, method, ...rest } = init;
+    const kitBaseUrl = new URL(`${this.baseUrl}/`);
+    const kitPath = toKitPath(path);
+    buildUrl(kitBaseUrl, kitPath);
+
+    const auth: AuthStrategy = {
+      apply: (headers) => {
+        headers.set("X-N8N-API-KEY", this.apiKey);
+        return Effect.succeed(headers);
+      },
+    };
+    const requestHeaders: HttpRequest["headers"] = {
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(initHeaders ?? {}),
+    };
+    const req: HttpRequest = {
+      method: normalizeHttpMethod(method),
+      path: kitPath,
+      headers: requestHeaders,
+      body,
+      bodyEncoding: body ? "text" : "none",
+      statusMapper: ({ status, method, path: mappedPath, bodyText, expectedStatuses }) =>
+        new UnexpectedStatusError({
+          method,
+          path: mappedPath,
+          status,
+          body: redactKey(bodyText, this.apiKey),
+          expected: expectedStatuses,
+        }),
+    };
+    const ctx: HttpContext = {
+      baseUrl: kitBaseUrl,
+      auth,
+      defaultHeaders: {
+        Accept: "application/json",
+      },
+      timeoutMs: this.timeoutMs,
+      fetch: makeCallerAbortFetch(caller),
+      redact: (value) => redactKey(value, this.apiKey),
+    };
+
+    const result = await (async () => {
+      try {
+        return await Effect.runPromise(
+          Effect.either(withRetry(sendRequest<T>(ctx, { ...req, ...rest }), noRetry)),
+        );
+      } catch (err) {
+        if (err instanceof N8nApiError) throw err;
+        if (isStatusOperatorError(err)) {
+          throw new N8nApiError(err.status, path, redactKey(err.body, this.apiKey));
+        }
+        if (isAbortError(err) && caller?.aborted) {
+          const e = new Error(`n8n request to ${path} aborted`);
+          e.name = "AbortError";
+          throw e;
+        }
+        const msg = operatorErrorMessage(err);
+        throw new Error(`n8n request to ${path} failed: ${redactKey(msg, this.apiKey)}`);
+      }
+    })();
+
+    if (result._tag === "Left") {
+      throw mapRequestError(result.left, path, caller, this.apiKey);
+    }
+    const response = result.right;
+    if (!response.bodyText) return {} as T;
+    return response.body;
+  }
+}
+
+function mapRequestError(
+  err: OperatorError,
+  path: string,
+  caller: AbortSignal | null | undefined,
+  apiKey: string,
+): Error {
+  if (isStatusOperatorError(err)) {
+    return new N8nApiError(err.status, path, redactKey(err.body, apiKey));
+  }
+  if (isAbortError(err) && caller?.aborted) {
+    const e = new Error(`n8n request to ${path} aborted`);
+    e.name = "AbortError";
+    return e;
+  }
+  const msg = operatorErrorMessage(err);
+  return new Error(`n8n request to ${path} failed: ${redactKey(msg, apiKey)}`);
+}
+
+function toKitPath(path: string): string {
+  return path.startsWith("/") ? path.slice(1) : path;
+}
+
+function normalizeHttpMethod(method: RequestInit["method"]): HttpMethod {
+  return (method ?? "GET").toUpperCase() as HttpMethod;
+}
+
+function makeCallerAbortFetch(caller: AbortSignal | null | undefined): typeof fetch {
+  return async (input, init = {}) => {
+    const fetchInput = input instanceof URL ? input.toString() : input;
+    const kitSignal = init.signal as AbortSignal | null | undefined;
+    if (!caller) return fetch(fetchInput, init);
+
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    let removeKitAbort: (() => void) | undefined;
+    let removeCallerAbort: (() => void) | undefined;
+
+    if (kitSignal) {
+      if (kitSignal.aborted) controller.abort();
       else {
-        onCallerAbort = () => controller.abort();
-        caller.addEventListener("abort", onCallerAbort, { once: true });
+        kitSignal.addEventListener("abort", abort, { once: true });
+        removeKitAbort = () => kitSignal.removeEventListener("abort", abort);
       }
     }
+    if (caller.aborted) controller.abort();
+    else {
+      caller.addEventListener("abort", abort, { once: true });
+      removeCallerAbort = () => caller.removeEventListener("abort", abort);
+    }
+
     try {
-      const { signal: _drop, ...rest } = init;
-      const res = await fetch(url, {
-        ...rest,
-        headers: {
-          "X-N8N-API-KEY": this.apiKey,
-          "Accept": "application/json",
-          ...(init.body ? { "Content-Type": "application/json" } : {}),
-          ...(init.headers ?? {}),
-        },
-        signal: controller.signal,
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        throw new N8nApiError(res.status, path, redactKey(text, this.apiKey));
-      }
-      if (!text) return {} as T;
-      return JSON.parse(text) as T;
-    } catch (err) {
-      if (err instanceof N8nApiError) throw err;
-      if (isAbortError(err) && caller?.aborted) {
-        const e = new Error(`n8n request to ${path} aborted`);
-        e.name = "AbortError";
-        throw e;
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`n8n request to ${path} failed: ${redactKey(msg, this.apiKey)}`);
+      return await fetch(fetchInput, { ...init, signal: controller.signal });
     } finally {
-      clearTimeout(timer);
-      if (caller && onCallerAbort) {
-        caller.removeEventListener("abort", onCallerAbort);
-      }
+      removeKitAbort?.();
+      removeCallerAbort?.();
     }
+  };
+}
+
+function isStatusOperatorError(err: unknown): err is UnexpectedStatusError {
+  return err instanceof UnexpectedStatusError;
+}
+
+function isOperatorError(err: unknown): err is OperatorError {
+  return Boolean(
+    err &&
+      typeof err === "object" &&
+      "_tag" in err,
+  );
+}
+
+function operatorErrorMessage(err: unknown): string {
+  if (!isOperatorError(err)) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  switch (err._tag) {
+    case "TimeoutError":
+      return "The operation was aborted";
+    case "TransportError":
+      return err.cause instanceof Error ? err.cause.message : String(err.cause);
+    case "ParseError":
+      return err.cause instanceof Error ? err.cause.message : err.message;
+    default:
+      return err instanceof Error ? err.message : String(err);
   }
 }
 

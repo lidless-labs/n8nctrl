@@ -55,7 +55,7 @@ Preserve all three layers when touching write tools:
 ## Gotchas
 - `VERSION` is hardcoded in `mcp-server.ts`. On a version bump, change it to match `package.json` or the server reports the wrong version.
 - The npm payload ships `src/` and `index.ts` alongside `dist/` because the OpenClaw plugin loads TypeScript directly. Do not drop them from `files` in `package.json`.
-- `hooks/pre-push` scans the working tree with content-guard (`~/repos/content-guard`, policy `policies/public-repo.json`) and blocks the push on violations. Fix the leak or add an inline `content-guard: allow <rule-id>` tag.
+- `hooks/pre-push` runs `brigade guard git` from embedded `brigade-cli`: it scans tracked files and pushed history with the embedded public-repo policy, plus optional private denylist and allow-values from `~/.config/content-guard/internal.json`, and blocks the push on violations. Fix the leak or add an inline `content-guard: allow <rule-id>` tag.
 - `n8n_trigger` mode `workflow` hits an endpoint most n8n builds do not expose (405). Webhook mode is the reliable path; keep tool descriptions steering that way.
 
 ## Memory Handoff
