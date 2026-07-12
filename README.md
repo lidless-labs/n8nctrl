@@ -65,6 +65,10 @@ Then ask your agent:
 
 It calls `n8n_list_executions` with `status=error`, then `n8n_get_execution` on the failing run for the per-node log and raw error.
 
+![n8nctrl ops loop workflow: an operator asks what broke, read tools list executions and inspect workflows, edit gates reveal writes, snapshots happen before confirmed actions](docs/assets/n8n-ops-loop-workflow.svg)
+
+Generated from [`docs/assets/workflows/n8n-ops-loop.json`](docs/assets/workflows/n8n-ops-loop.json) with the [Lidless fleet-kit workflow renderer](https://github.com/lidless-labs/lidless-fleet-kit/tree/main/workflow).
+
 ## Tools
 
 40 tools across read-only ops, the workflow + execution lifecycle, tags, and credentials. Write tools (marked) are hidden unless `N8N_ENABLE_EDIT=true`; credential writes (marked ✓✓) need a second gate.
