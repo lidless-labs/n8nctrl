@@ -4,7 +4,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import type { N8nClient } from "./src/client.ts";
-import { makeClient, type N8nPluginConfig } from "./src/config.ts";
+import { makeClient, readConfigFromEnv, type N8nPluginConfig } from "./src/config.ts";
 
 import { createListWorkflowsTool } from "./src/tools/list-workflows.ts";
 import { createGetWorkflowTool } from "./src/tools/get-workflow.ts";
@@ -50,53 +50,6 @@ import { createDeleteCredentialTool } from "./src/tools/delete-credential.ts";
 import { createCheckDisabledNodesTool } from "./src/tools/check-disabled-nodes.ts";
 
 const VERSION = "0.14.0";
-
-function readConfigFromEnv(): N8nPluginConfig {
-  const baseUrl = (process.env.N8N_BASE_URL ?? "").trim();
-  if (!baseUrl) {
-    throw new Error(
-      "N8N_BASE_URL is required (e.g. http://localhost:5678). Set it in your MCP client env config.",
-    );
-  }
-  const apiKeyEnv = (process.env.N8N_API_KEY_ENV ?? "N8N_API_KEY").trim() || "N8N_API_KEY";
-  const apiKey = (process.env[apiKeyEnv] ?? "").trim();
-  if (!apiKey) {
-    throw new Error(
-      `${apiKeyEnv} is required. Set it in your MCP client env config (generate an API key in n8n under Settings -> API).`,
-    );
-  }
-  return {
-    baseUrl,
-    apiKeyInline: apiKey,
-    apiKeyEnv,
-    enableEdit: parseBool(process.env.N8N_ENABLE_EDIT) ?? false,
-    enableCredentialsWrite:
-      parseBool(process.env.N8N_ENABLE_CREDENTIALS_WRITE) ?? false,
-    maxExecutionLogBytes: parsePosInt("N8N_MAX_EXECUTION_LOG_BYTES", 65_536, 1024),
-    requestTimeoutMs: parsePosInt("N8N_REQUEST_TIMEOUT_MS", 15_000, 1000),
-    backupDir: (process.env.N8N_BACKUP_DIR ?? "").trim() || undefined,
-  };
-}
-
-function parseBool(raw: string | undefined): boolean | undefined {
-  if (raw === undefined) return undefined;
-  const v = raw.trim().toLowerCase();
-  if (v === "1" || v === "true" || v === "yes") return true;
-  if (v === "0" || v === "false" || v === "no") return false;
-  return undefined;
-}
-
-function parsePosInt(envName: string, fallback: number, min: number): number {
-  const raw = process.env[envName];
-  if (raw === undefined || raw.trim() === "") return fallback;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || !Number.isInteger(n) || n < min) {
-    throw new Error(
-      `${envName} must be an integer >= ${min} (got ${JSON.stringify(raw)}).`,
-    );
-  }
-  return n;
-}
 
 function lazyClient(config: N8nPluginConfig): () => N8nClient {
   let cached: N8nClient | undefined;

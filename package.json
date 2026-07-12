@@ -59,6 +59,7 @@
     "@lidless-labs/effect-operator-kit": "file:../effect-operator-kit",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@sinclair/typebox": "^0.34.0",
+    "effect": "^3.21.4",
     "zod": "^4.3.0"
   },
   "peerDependencies": {
