@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { operatorErrorMessage } from "@lidless-labs/effect-operator-kit";
 import { N8nClient } from "./client.ts";
 import { makeClient, type N8nPluginConfig } from "./config.ts";
 import { serve } from "../mcp-server.ts";
@@ -808,7 +809,8 @@ export async function run(argv: string[], deps: CliDeps): Promise<number> {
       }
     }
   } catch (error) {
-    deps.err(client.redact(error instanceof Error ? error.message : String(error)));
+    // Kit cli adapter message extraction with repo-owned redact (not kit defaultRedact).
+    deps.err(client.redact(operatorErrorMessage(error)));
     return 1;
   }
   return 0;

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { fail, operatorErrorMessage } from "@lidless-labs/effect-operator-kit";
 import { z } from "zod";
 
 import type { N8nClient } from "./src/client.ts";
@@ -68,20 +69,26 @@ type ToolFactoryResult = {
   }>;
 };
 
-function bind<Shape extends z.ZodRawShape>(
-  server: McpServer,
-  tool: ToolFactoryResult,
-  shape: Shape,
-): void {
-  const handler = async (args: unknown): Promise<CallToolResult> => {
-    const res = await tool.execute("mcp", args as Record<string, unknown>);
-    return { content: res.content };
-  };
-  server.tool(tool.name, tool.description, shape, handler as never);
-}
-
 export function buildServer(config: N8nPluginConfig): McpServer {
   const getClient = lazyClient(config);
+
+  function bind<Shape extends z.ZodRawShape>(
+    server: McpServer,
+    tool: ToolFactoryResult,
+    shape: Shape,
+  ): void {
+    const handler = async (args: unknown): Promise<CallToolResult> => {
+      try {
+        const res = await tool.execute("mcp", args as Record<string, unknown>);
+        return { content: res.content };
+      } catch (error) {
+        // Kit mcp adapter fail() shape with repo-owned redact (not kit defaultRedact).
+        const failed = fail(getClient().redact(operatorErrorMessage(error)));
+        return { content: failed.content, isError: failed.isError };
+      }
+    };
+    server.tool(tool.name, tool.description, shape, handler as never);
+  }
 
   const server = new McpServer({
     name: "n8n-ops-mcp",
