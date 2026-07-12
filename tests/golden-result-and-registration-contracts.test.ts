@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { buildServer } from "../mcp-server.ts";
+import n8nPlugin from "../index.ts";
 import type { N8nPluginConfig } from "../src/config.ts";
 import { createExecutionStatsTool } from "../src/tools/execution-stats.ts";
 import { createGetWorkflowTool } from "../src/tools/get-workflow.ts";
@@ -37,6 +38,27 @@ function baseConfig(overrides: Partial<N8nPluginConfig> = {}): N8nPluginConfig {
 function registeredToolNames(server: McpServer): string[] {
   const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
   return Object.keys(tools).sort();
+}
+
+function pluginRegisteredToolNames(config: N8nPluginConfig): string[] {
+  const names: string[] = [];
+  n8nPlugin.register?.({
+    registrationMode: "full",
+    pluginConfig: {
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKeyInline,
+      apiKeyEnv: config.apiKeyEnv,
+      enableEdit: config.enableEdit,
+      enableCredentialsWrite: config.enableCredentialsWrite,
+      maxExecutionLogBytes: config.maxExecutionLogBytes,
+      requestTimeoutMs: config.requestTimeoutMs,
+      backupDir: config.backupDir,
+    },
+    registerTool: (tool: { name: string }) => {
+      names.push(tool.name);
+    },
+  } as never);
+  return names.sort();
 }
 
 function expectDetailsField(result: ToolResult, expected: Record<string, unknown>): void {
@@ -147,6 +169,19 @@ describe("golden credential write registration gates", () => {
     expect(names).not.toContain("n8n_save_workflow");
   });
 
+  it("hides all write tools when edit is disabled even if the credential write gate is enabled", () => {
+    const names = registeredToolNames(
+      buildServer(
+        baseConfig({ enableEdit: false, enableCredentialsWrite: true }),
+      ),
+    );
+
+    expect(names).not.toContain("n8n_save_workflow");
+    expect(names).not.toContain("n8n_delete_workflow");
+    expect(names).not.toContain("n8n_create_credential");
+    expect(names).not.toContain("n8n_delete_credential");
+  });
+
   it("still hides credential write tools when edit is enabled without the credential write gate", () => {
     const names = registeredToolNames(
       buildServer(baseConfig({ enableEdit: true, enableCredentialsWrite: false })),
@@ -165,5 +200,29 @@ describe("golden credential write registration gates", () => {
 
     expect(names).toContain("n8n_create_credential");
     expect(names).toContain("n8n_delete_credential");
+  });
+
+  it("uses the same credential write gates on the OpenClaw plugin surface", () => {
+    const disabled = pluginRegisteredToolNames(
+      baseConfig({ enableEdit: false, enableCredentialsWrite: true }),
+    );
+    expect(disabled).not.toContain("n8n_save_workflow");
+    expect(disabled).not.toContain("n8n_delete_workflow");
+    expect(disabled).not.toContain("n8n_create_credential");
+    expect(disabled).not.toContain("n8n_delete_credential");
+
+    const editOnly = pluginRegisteredToolNames(
+      baseConfig({ enableEdit: true, enableCredentialsWrite: false }),
+    );
+    expect(editOnly).toContain("n8n_save_workflow");
+    expect(editOnly).toContain("n8n_delete_workflow");
+    expect(editOnly).not.toContain("n8n_create_credential");
+    expect(editOnly).not.toContain("n8n_delete_credential");
+
+    const full = pluginRegisteredToolNames(
+      baseConfig({ enableEdit: true, enableCredentialsWrite: true }),
+    );
+    expect(full).toContain("n8n_create_credential");
+    expect(full).toContain("n8n_delete_credential");
   });
 });

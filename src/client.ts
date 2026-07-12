@@ -695,7 +695,7 @@ export class N8nClient {
           method,
           path: mappedPath,
           status,
-          body: bodyText,
+          body: redactKey(bodyText, this.apiKey),
           expected: expectedStatuses,
         }),
     };
@@ -710,34 +710,32 @@ export class N8nClient {
       redact: (value) => redactKey(value, this.apiKey),
     };
 
-    try {
-      const result = await Effect.runPromise(
-        Effect.either(withRetry(sendRequest<T>(ctx, { ...req, ...rest }), noRetry)),
-      );
-      if (result._tag === "Left") {
-        throw mapRequestError(result.left, path, caller, this.apiKey);
+    const result = await (async () => {
+      try {
+        return await Effect.runPromise(
+          Effect.either(withRetry(sendRequest<T>(ctx, { ...req, ...rest }), noRetry)),
+        );
+      } catch (err) {
+        if (err instanceof N8nApiError) throw err;
+        if (isStatusOperatorError(err)) {
+          throw new N8nApiError(err.status, path, redactKey(err.body, this.apiKey));
+        }
+        if (isAbortError(err) && caller?.aborted) {
+          const e = new Error(`n8n request to ${path} aborted`);
+          e.name = "AbortError";
+          throw e;
+        }
+        const msg = operatorErrorMessage(err);
+        throw new Error(`n8n request to ${path} failed: ${redactKey(msg, this.apiKey)}`);
       }
-      const response = result.right;
-      if (!response.bodyText) return {} as T;
-      return response.body;
-    } catch (err) {
-      if (err instanceof N8nApiError) throw err;
-      if (isStatusOperatorError(err)) {
-        throw new N8nApiError(err.status, path, err.body);
-      }
-      if (isAbortError(err) && caller?.aborted) {
-        const e = new Error(`n8n request to ${path} aborted`);
-        e.name = "AbortError";
-        throw e;
-      }
-      if (isOperatorError(err) && caller?.aborted) {
-        const e = new Error(`n8n request to ${path} aborted`);
-        e.name = "AbortError";
-        throw e;
-      }
-      const msg = operatorErrorMessage(err);
-      throw new Error(`n8n request to ${path} failed: ${redactKey(msg, this.apiKey)}`);
+    })();
+
+    if (result._tag === "Left") {
+      throw mapRequestError(result.left, path, caller, this.apiKey);
     }
+    const response = result.right;
+    if (!response.bodyText) return {} as T;
+    return response.body;
   }
 }
 
@@ -748,9 +746,9 @@ function mapRequestError(
   apiKey: string,
 ): Error {
   if (isStatusOperatorError(err)) {
-    return new N8nApiError(err.status, path, err.body);
+    return new N8nApiError(err.status, path, redactKey(err.body, apiKey));
   }
-  if (caller?.aborted) {
+  if (isAbortError(err) && caller?.aborted) {
     const e = new Error(`n8n request to ${path} aborted`);
     e.name = "AbortError";
     return e;

@@ -273,6 +273,45 @@ describe("N8nClient wire shape", () => {
       // In-flight aborted ids are NOT in results (intentionally skipped).
       expect(byId["5"]).toBeUndefined();
     });
+
+    it("records a real network failure during a batch abort as an error", async () => {
+      fake.restore();
+      const calls: string[] = [];
+      globalThis.fetch = (async (
+        input: string,
+        init: RequestInit = {},
+      ) => {
+        const id = input.split("/").pop()!;
+        calls.push(id);
+        const signal = init.signal as AbortSignal | undefined;
+
+        if (id === "1") {
+          await new Promise((r) => setTimeout(r, 10));
+          return new Response("boom", { status: 500 });
+        }
+
+        return new Promise<Response>((_, reject) => {
+          const fail = () => reject(new Error("socket hang up while aborting peers"));
+          if (signal?.aborted) {
+            fail();
+            return;
+          }
+          signal?.addEventListener("abort", fail, { once: true });
+        });
+      }) as unknown as typeof fetch;
+
+      const client = buildClient();
+      const results = await client.deleteExecutions(["1", "2"], { concurrency: 2 });
+
+      expect(calls).toEqual(["1", "2"]);
+      const byId = Object.fromEntries(results.map((r) => [r.id, r]));
+      expect(byId["1"]?.reason).toBe("server_error");
+      expect(byId["2"]).toMatchObject({
+        ok: false,
+        reason: "error",
+        message: "n8n request to /api/v1/executions/2 failed: socket hang up while aborting peers",
+      });
+    });
   });
 
   describe("getExecution", () => {
@@ -341,6 +380,18 @@ describe("N8nClient wire shape", () => {
       expect(parsed.searchParams.get("limit")).toBe("10");
       expect(parsed.searchParams.get("cursor")).toBe("next-token");
       expect(parsed.searchParams.get("includeData")).toBe("true");
+    });
+
+    it("percent-encodes reserved cursor characters in the query string", async () => {
+      fake.queue({ status: 200, body: { data: [] } });
+      const client = buildClient();
+
+      await client.listExecutions({ cursor: "next/part?x=1&y=two+words" });
+
+      const [call] = fake.calls;
+      expect(call.url).toBe(
+        `${BASE}/api/v1/executions?cursor=next%2Fpart%3Fx%3D1%26y%3Dtwo%2Bwords`,
+      );
     });
 
     it("omits includeData when falsy", async () => {
@@ -740,6 +791,22 @@ describe("N8nClient wire shape", () => {
       });
     });
 
+    it("throws generic request errors with one n8n request prefix", async () => {
+      fake.queue({ rejectWith: new Error(`connect ECONNREFUSED key=${API_KEY}`) });
+      const client = buildClient();
+
+      let message = "";
+      try {
+        await client.getWorkflow("wf-1");
+      } catch (err) {
+        message = err instanceof Error ? err.message : String(err);
+      }
+
+      expect(message).toBe(
+        "n8n request to /api/v1/workflows/wf-1 failed: connect ECONNREFUSED key=***REDACTED***",
+      );
+    });
+
     it("aborts via the timeout branch and the rejection message is still redacted", async () => {
       fake.queue({ hangUntilAbort: true });
       const client = buildClient({ timeoutMs: 5 });
@@ -756,6 +823,26 @@ describe("N8nClient wire shape", () => {
       // API key must not be in the thrown message (even though abort messages
       // don't normally contain it, the redaction path still runs).
       expect(msg).not.toContain(API_KEY);
+    });
+
+    it("redacts status bodies before constructing N8nApiError", async () => {
+      fake.queue({
+        status: 500,
+        text: `upstream leaked key=${API_KEY}`,
+      });
+      const client = buildClient();
+
+      let caught: unknown;
+      try {
+        await client.getWorkflow("wf-1");
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(N8nApiError);
+      expect((caught as Error).message).toBe(
+        "n8n 500 on /api/v1/workflows/wf-1: upstream leaked key=***REDACTED***",
+      );
     });
   });
 

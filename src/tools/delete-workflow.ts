@@ -63,7 +63,7 @@ export function createDeleteWorkflowTool(deps: DeleteWorkflowDeps) {
       try {
         backupPath = await writeBackup(resolveBackupDir(deps.backupDir), current);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = client.redact(err instanceof Error ? err.message : String(err));
         return jsonToolResult({
           ok: false,
           action: "delete",
@@ -95,7 +95,7 @@ export function createDeleteWorkflowTool(deps: DeleteWorkflowDeps) {
             backupPath,
           });
         }
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = client.redact(err instanceof Error ? err.message : String(err));
         return jsonToolResult({
           ok: false,
           action: "delete",
