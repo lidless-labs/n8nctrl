@@ -2,6 +2,9 @@
   <img src="docs/assets/n8nctrl-social-preview.jpg" alt="n8nctrl banner" width="900">
 </p>
 
+<p align="center">
+  <a href="https://lidless.dev"><img src="docs/assets/marks/n8nctrl-circle.png" width="48" alt="Lidless Labs"></a>
+</p>
 <h1 align="center">n8nctrl</h1>
 
 <p align="center">
@@ -500,3 +503,11 @@ See [CHANGELOG.md](./CHANGELOG.md) for the full version history.
 ## License
 
 MIT. See [LICENSE](./LICENSE).
+
+---
+
+<p align="center"><a href="https://lidless.dev">Part of <strong>Lidless Labs</strong></a> &middot; the eye does not close</p>
+
+<p align="center"><sub><strong>Network:</strong> <a href="https://github.com/lidless-labs/librenmsctrl">librenmsctrl</a> &middot; <a href="https://github.com/lidless-labs/watchtower">watchtower</a> &middot; <a href="https://github.com/lidless-labs/portgrid">portgrid</a> &middot; <a href="https://github.com/lidless-labs/cutsheet">cutsheet</a> &middot; <a href="https://github.com/lidless-labs/eero-cli">eero-cli</a></sub></p>
+
+<p align="center"><sub><a href="https://lidless.dev">All tools</a> &middot; <a href="https://github.com/lidless-labs">Lidless Labs on GitHub</a></sub></p>
