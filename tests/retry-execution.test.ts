@@ -16,6 +16,30 @@ function buildTool(client: N8nClient) {
 }
 
 describe("n8n_retry_execution", () => {
+  it("refuses without confirm=true and never touches the client", async () => {
+    const retryExecution = vi.fn();
+    const client = makeFakeClient({ retryExecution });
+    const tool = buildTool(client);
+
+    const details = await run(tool, { id: "42" });
+
+    expect(details.ok).toBe(false);
+    expect(details.error).toMatch(/confirm must be true/);
+    expect(details.originalExecutionId).toBe("42");
+    expect(retryExecution).not.toHaveBeenCalled();
+  });
+
+  it("refuses with confirm:false and never touches the client", async () => {
+    const retryExecution = vi.fn();
+    const client = makeFakeClient({ retryExecution });
+    const tool = buildTool(client);
+
+    const details = await run(tool, { id: "42", confirm: false });
+
+    expect(details.ok).toBe(false);
+    expect(retryExecution).not.toHaveBeenCalled();
+  });
+
   it("retries a failed execution and surfaces both the original and new execution ids", async () => {
     const retried: N8nExecution = {
       id: "43",
@@ -30,7 +54,7 @@ describe("n8n_retry_execution", () => {
     const client = makeFakeClient({ retryExecution });
     const tool = buildTool(client);
 
-    const details = await run(tool, { id: "42" });
+    const details = await run(tool, { id: "42", confirm: true });
 
     expect(retryExecution).toHaveBeenCalledWith("42", {});
     expect(details).toMatchObject({
@@ -59,7 +83,7 @@ describe("n8n_retry_execution", () => {
     const client = makeFakeClient({ retryExecution });
     const tool = buildTool(client);
 
-    const details = await run(tool, { id: "99", loadWorkflow: true });
+    const details = await run(tool, { id: "99", loadWorkflow: true, confirm: true });
 
     expect(retryExecution).toHaveBeenCalledWith("99", { loadWorkflow: true });
     expect(details.loadWorkflow).toBe(true);
@@ -74,7 +98,7 @@ describe("n8n_retry_execution", () => {
     const client = makeFakeClient({ retryExecution });
     const tool = buildTool(client);
 
-    const details = await run(tool, { id: "999" });
+    const details = await run(tool, { id: "999", confirm: true });
 
     expect(details.ok).toBe(false);
     expect(details.reason).toBe("not_found");
@@ -90,7 +114,7 @@ describe("n8n_retry_execution", () => {
     const client = makeFakeClient({ retryExecution });
     const tool = buildTool(client);
 
-    const details = await run(tool, { id: "77" });
+    const details = await run(tool, { id: "77", confirm: true });
 
     expect(details.ok).toBe(false);
     expect(details.reason).toBe("not_retryable");
@@ -106,6 +130,6 @@ describe("n8n_retry_execution", () => {
     const client = makeFakeClient({ retryExecution });
     const tool = buildTool(client);
 
-    await expect(run(tool, { id: "7" })).rejects.toThrow(/upstream exploded/);
+    await expect(run(tool, { id: "7", confirm: true })).rejects.toThrow(/upstream exploded/);
   });
 });

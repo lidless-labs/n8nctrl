@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import type { N8nClient, N8nWorkflow } from "../src/client.ts";
 import { createActivateTool } from "../src/tools/activate.ts";
-import { createArchiveWorkflowTool } from "../src/tools/archive-workflow.ts";
+import { createArchiveWorkflowTool, createUnarchiveWorkflowTool } from "../src/tools/archive-workflow.ts";
+import { createCancelExecutionTool } from "../src/tools/cancel-execution.ts";
 import { createCreateCredentialTool } from "../src/tools/create-credential.ts";
 import { createCreateTagTool } from "../src/tools/create-tag.ts";
 import { createCreateWorkflowTool } from "../src/tools/create-workflow.ts";
@@ -15,6 +16,7 @@ import { createDeleteExecutionsTool } from "../src/tools/delete-executions.ts";
 import { createDeleteTagTool } from "../src/tools/delete-tag.ts";
 import { createDeleteWorkflowTool } from "../src/tools/delete-workflow.ts";
 import { createPinNodeDataTool } from "../src/tools/pin-node-data.ts";
+import { createRetryExecutionTool } from "../src/tools/retry-execution.ts";
 import { createRetryExecutionsTool } from "../src/tools/retry-executions.ts";
 import { createSaveWorkflowTool } from "../src/tools/save-workflow.ts";
 import { createSetWorkflowTagsTool } from "../src/tools/set-workflow-tags.ts";
@@ -133,6 +135,18 @@ describe("golden confirm-gated write refusal contracts", () => {
       },
     },
     {
+      name: "unarchive workflow",
+      build: (client: N8nClient) => createUnarchiveWorkflowTool(() => client),
+      params: { id: "wf-1" },
+      refusal: {
+        ok: false,
+        action: "unarchive",
+        workflowId: "wf-1",
+        error: "confirm must be true to unarchive",
+        hint: "Restores the workflow to the active collection but does NOT reactivate triggers. Call n8n_activate with confirm=true when you want them running again.",
+      },
+    },
+    {
       name: "delete workflow",
       build: (client: N8nClient) => createDeleteWorkflowTool({ getClient: () => client, backupDir: "/tmp/no-fetch" }),
       params: { id: "wf-1" },
@@ -205,6 +219,18 @@ describe("golden confirm-gated write refusal contracts", () => {
       },
     },
     {
+      name: "retry execution",
+      build: (client: N8nClient) => createRetryExecutionTool(() => client),
+      params: { id: "ex-1" },
+      refusal: {
+        ok: false,
+        action: "retry",
+        originalExecutionId: "ex-1",
+        error: "confirm must be true to retry",
+        hint: "Each retry spawns a new execution that may re-run side effects (HTTP calls, DB writes, etc). Verify the workflow is safe to re-run before confirming.",
+      },
+    },
+    {
       name: "retry executions",
       build: (client: N8nClient) => createRetryExecutionsTool(() => client),
       params: { ids: ["ex-1"] },
@@ -213,6 +239,18 @@ describe("golden confirm-gated write refusal contracts", () => {
         action: "retry_batch",
         error: "confirm must be true to retry",
         hint: "Each retry spawns a new execution that may re-run side effects (HTTP calls, DB writes, etc). Verify the workflow is safe to re-run before confirming.",
+      },
+    },
+    {
+      name: "cancel execution",
+      build: (client: N8nClient) => createCancelExecutionTool(() => client),
+      params: { id: "ex-1" },
+      refusal: {
+        ok: false,
+        action: "cancel",
+        executionId: "ex-1",
+        error: "confirm must be true to cancel",
+        hint: "Cancellation can leave a multi-step automation partially applied (e.g. a record written but its follow-up notification or cleanup never run). Fetch n8n_get_execution first if you need the current state.",
       },
     },
     {

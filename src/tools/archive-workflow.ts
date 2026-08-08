@@ -16,6 +16,10 @@ const ArchiveSchema = Type.Object(
 const UnarchiveSchema = Type.Object(
   {
     id: Type.String({ description: "Workflow id (from n8n_list_workflows)." }),
+    confirm: Type.Boolean({
+      description:
+        "Must be true to actually unarchive. Restores the workflow to the active collection but does NOT reactivate triggers. Call n8n_activate with confirm=true when you want them running again.",
+    }),
   },
   { additionalProperties: false },
 );
@@ -37,7 +41,7 @@ function buildTool(getClient: () => N8nClient, action: Action) {
   const description =
     action === "archive"
       ? "Soft-delete (archive) an n8n workflow via POST /workflows/{id}/archive. Reversible: pair with n8n_unarchive_workflow to restore. Idempotent: archiving an already-archived workflow returns the current state. Side effect: archiving deactivates the workflow, so triggers (webhooks, schedules) stop firing. Prefer this over n8n_delete_workflow for cleanup; it keeps history and definitions intact. Requires enableEdit and explicit confirm=true."
-      : "Restore an archived workflow via POST /workflows/{id}/unarchive. Does NOT reactivate: triggers stay off until n8n_activate is called explicitly. Requires enableEdit.";
+      : "Restore an archived workflow via POST /workflows/{id}/unarchive. Does NOT reactivate: triggers stay off until n8n_activate is called explicitly. Requires enableEdit and explicit confirm=true.";
 
   return {
     name,
@@ -46,12 +50,21 @@ function buildTool(getClient: () => N8nClient, action: Action) {
     parameters: action === "archive" ? ArchiveSchema : UnarchiveSchema,
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
       const { id, confirm } = rawParams as { id: string; confirm?: boolean };
-      if (action === "archive" && !confirm) {
+      if (!confirm) {
+        if (action === "archive") {
+          return jsonToolResult({
+            ok: false,
+            action,
+            workflowId: id,
+            error: "confirm must be true to archive",
+          });
+        }
         return jsonToolResult({
           ok: false,
           action,
           workflowId: id,
-          error: "confirm must be true to archive",
+          error: "confirm must be true to unarchive",
+          hint: "Restores the workflow to the active collection but does NOT reactivate triggers. Call n8n_activate with confirm=true when you want them running again.",
         });
       }
       const client = getClient();

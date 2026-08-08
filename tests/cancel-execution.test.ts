@@ -16,6 +16,30 @@ function buildTool(client: N8nClient) {
 }
 
 describe("n8n_cancel_execution", () => {
+  it("refuses without confirm=true and never touches the client", async () => {
+    const stopExecution = vi.fn();
+    const client = makeFakeClient({ stopExecution });
+    const tool = buildTool(client);
+
+    const details = await run(tool, { id: "42" });
+
+    expect(details.ok).toBe(false);
+    expect(details.error).toMatch(/confirm must be true/);
+    expect(details.executionId).toBe("42");
+    expect(stopExecution).not.toHaveBeenCalled();
+  });
+
+  it("refuses with confirm:false and never touches the client", async () => {
+    const stopExecution = vi.fn();
+    const client = makeFakeClient({ stopExecution });
+    const tool = buildTool(client);
+
+    const details = await run(tool, { id: "42", confirm: false });
+
+    expect(details.ok).toBe(false);
+    expect(stopExecution).not.toHaveBeenCalled();
+  });
+
   it("stops a running execution and returns a success summary", async () => {
     const stopped: N8nExecution = {
       id: "42",
@@ -31,7 +55,7 @@ describe("n8n_cancel_execution", () => {
     const client = makeFakeClient({ stopExecution });
     const tool = buildTool(client);
 
-    const details = await run(tool, { id: "42" });
+    const details = await run(tool, { id: "42", confirm: true });
 
     expect(stopExecution).toHaveBeenCalledWith("42");
     expect(details).toMatchObject({
@@ -56,7 +80,7 @@ describe("n8n_cancel_execution", () => {
     const client = makeFakeClient({ stopExecution });
     const tool = buildTool(client);
 
-    const details = await run(tool, { id: "999" });
+    const details = await run(tool, { id: "999", confirm: true });
 
     expect(details.ok).toBe(false);
     expect(details.reason).toBe("not_found_or_finished");
@@ -72,6 +96,6 @@ describe("n8n_cancel_execution", () => {
     const client = makeFakeClient({ stopExecution });
     const tool = buildTool(client);
 
-    await expect(run(tool, { id: "7" })).rejects.toThrow(/upstream exploded/);
+    await expect(run(tool, { id: "7", confirm: true })).rejects.toThrow(/upstream exploded/);
   });
 });

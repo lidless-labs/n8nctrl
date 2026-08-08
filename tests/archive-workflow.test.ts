@@ -116,13 +116,37 @@ describe("n8n_archive_workflow", () => {
 });
 
 describe("n8n_unarchive_workflow", () => {
+  it("refuses without confirm=true and never touches the client", async () => {
+    const unarchiveWorkflow = vi.fn();
+    const client = makeFakeClient({ unarchiveWorkflow });
+    const tool = createUnarchiveWorkflowTool(() => client);
+
+    const details = await run(tool, { id: "wf-42" });
+
+    expect(details.ok).toBe(false);
+    expect(details.error).toMatch(/confirm must be true/);
+    expect(details.workflowId).toBe("wf-42");
+    expect(unarchiveWorkflow).not.toHaveBeenCalled();
+  });
+
+  it("refuses with confirm:false and never touches the client", async () => {
+    const unarchiveWorkflow = vi.fn();
+    const client = makeFakeClient({ unarchiveWorkflow });
+    const tool = createUnarchiveWorkflowTool(() => client);
+
+    const details = await run(tool, { id: "wf-42", confirm: false });
+
+    expect(details.ok).toBe(false);
+    expect(unarchiveWorkflow).not.toHaveBeenCalled();
+  });
+
   it("unarchives a workflow and reports that it is NOT reactivated", async () => {
     const unarchived = baseWorkflow({ active: false, isArchived: false });
     const unarchiveWorkflow = vi.fn().mockResolvedValue(unarchived);
     const client = makeFakeClient({ unarchiveWorkflow });
     const tool = createUnarchiveWorkflowTool(() => client);
 
-    const details = await run(tool, { id: "wf-42" });
+    const details = await run(tool, { id: "wf-42", confirm: true });
 
     expect(unarchiveWorkflow).toHaveBeenCalledWith("wf-42");
     expect(details).toMatchObject({
@@ -143,7 +167,7 @@ describe("n8n_unarchive_workflow", () => {
     const client = makeFakeClient({ unarchiveWorkflow });
     const tool = createUnarchiveWorkflowTool(() => client);
 
-    const details = await run(tool, { id: "ghost" });
+    const details = await run(tool, { id: "ghost", confirm: true });
 
     expect(details.ok).toBe(false);
     expect(details.reason).toBe("not_found");
