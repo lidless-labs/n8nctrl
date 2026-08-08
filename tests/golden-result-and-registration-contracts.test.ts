@@ -40,6 +40,42 @@ function registeredToolNames(server: McpServer): string[] {
   return Object.keys(tools).sort();
 }
 
+function registeredToolParameterNames(server: McpServer, toolName: string): string[] {
+  const tools = (server as unknown as {
+    _registeredTools: Record<string, { inputSchema?: { shape?: Record<string, unknown> } }>;
+  })._registeredTools;
+  const schema = tools[toolName]?.inputSchema;
+  expect(schema, `${toolName} should be registered`).toBeDefined();
+  return schema?.shape ? Object.keys(schema.shape) : [];
+}
+
+function pluginToolParameters(
+  config: N8nPluginConfig,
+  toolName: string,
+): Record<string, unknown> {
+  let parameters: Record<string, unknown> | undefined;
+  n8nPlugin.register?.({
+    registrationMode: "full",
+    pluginConfig: {
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKeyInline,
+      apiKeyEnv: config.apiKeyEnv,
+      enableEdit: config.enableEdit,
+      enableCredentialsWrite: config.enableCredentialsWrite,
+      maxExecutionLogBytes: config.maxExecutionLogBytes,
+      requestTimeoutMs: config.requestTimeoutMs,
+      backupDir: config.backupDir,
+    },
+    registerTool: (tool: { name: string; parameters?: { properties?: Record<string, unknown> } }) => {
+      if (tool.name === toolName) {
+        parameters = tool.parameters?.properties;
+      }
+    },
+  } as never);
+  expect(parameters, `${toolName} should be registered`).toBeDefined();
+  return parameters ?? {};
+}
+
 function pluginRegisteredToolNames(config: N8nPluginConfig): string[] {
   const names: string[] = [];
   n8nPlugin.register?.({
@@ -225,4 +261,34 @@ describe("golden credential write registration gates", () => {
     expect(full).toContain("n8n_create_credential");
     expect(full).toContain("n8n_delete_credential");
   });
+});
+
+describe("golden confirm-gated write registration contracts", () => {
+  const CONFIRM_GATED_WRITE_TOOLS = [
+    "n8n_unarchive_workflow",
+    "n8n_cancel_execution",
+    "n8n_retry_execution",
+  ] as const;
+
+  it.each(CONFIRM_GATED_WRITE_TOOLS)(
+    "MCP registration for %s exposes confirm when edit is enabled",
+    (toolName) => {
+      const parameterNames = registeredToolParameterNames(
+        buildServer(baseConfig({ enableEdit: true })),
+        toolName,
+      );
+      expect(parameterNames).toContain("confirm");
+    },
+  );
+
+  it.each(CONFIRM_GATED_WRITE_TOOLS)(
+    "OpenClaw plugin registration for %s exposes confirm when edit is enabled",
+    (toolName) => {
+      const properties = pluginToolParameters(
+        baseConfig({ enableEdit: true }),
+        toolName,
+      );
+      expect(properties).toHaveProperty("confirm");
+    },
+  );
 });

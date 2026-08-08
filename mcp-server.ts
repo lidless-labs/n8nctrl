@@ -621,6 +621,11 @@ export function buildServer(config: N8nPluginConfig): McpServer {
         .describe(
           "Execution id to stop (from n8n_list_executions or n8n_search_executions).",
         ),
+      confirm: z
+        .boolean()
+        .describe(
+          "Must be true to actually cancel. Cancellation can leave a multi-step automation partially applied (e.g. a record written but its follow-up notification or cleanup never run).",
+        ),
     });
 
     bind(server, createRetryExecutionTool(getClient), {
@@ -628,6 +633,11 @@ export function buildServer(config: N8nPluginConfig): McpServer {
         .string()
         .describe(
           "Execution id to retry (from n8n_list_executions or n8n_search_executions). The response contains a NEW execution id.",
+        ),
+      confirm: z
+        .boolean()
+        .describe(
+          "Must be true to actually retry. Each retry spawns a new execution that may re-run side effects (HTTP calls, DB writes, etc).",
         ),
       loadWorkflow: z
         .boolean()
@@ -682,6 +692,11 @@ export function buildServer(config: N8nPluginConfig): McpServer {
 
     bind(server, createUnarchiveWorkflowTool(getClient), {
       id: z.string().describe("Workflow id to unarchive (from n8n_list_workflows)."),
+      confirm: z
+        .boolean()
+        .describe(
+          "Must be true to actually unarchive. Restores the workflow to the active collection but does NOT reactivate triggers. Call n8n_activate when you want them running again.",
+        ),
     });
 
     bind(

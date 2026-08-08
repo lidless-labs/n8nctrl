@@ -104,10 +104,10 @@ Generated from [`docs/assets/workflows/n8n-ops-loop.json`](docs/assets/workflows
 | `n8n_deactivate` | Disable a workflow's triggers (confirm-gated) | ✓ |
 | `n8n_save_workflow` | Overwrite a workflow with auto-backup + validation + confirm gate | ✓ |
 | `n8n_archive_workflow` | Soft-delete a workflow (confirm-gated; reversible; preserves id) | ✓ |
-| `n8n_unarchive_workflow` | Restore an archived workflow (does NOT reactivate) | ✓ |
+| `n8n_unarchive_workflow` | Restore an archived workflow (confirm-gated; does NOT reactivate) | ✓ |
 | `n8n_delete_workflow` | Permanently delete a workflow (confirm-gated, snapshot-before-delete, restore via `n8n_create_workflow`) | ✓ |
-| `n8n_cancel_execution` | Stop a running or waiting execution by id | ✓ |
-| `n8n_retry_execution` | Retry a failed execution by id (returns a new execution) | ✓ |
+| `n8n_cancel_execution` | Stop a running or waiting execution by id (confirm-gated) | ✓ |
+| `n8n_retry_execution` | Retry a failed execution by id (confirm-gated; returns a new execution) | ✓ |
 | `n8n_delete_execution` | Permanently delete an execution record (confirm-gated, irreversible) | ✓ |
 | `n8n_delete_executions` | Batch form of delete (client-side fan-out, confirm-gated, irreversible, max 50 ids) | ✓ |
 | `n8n_pin_node_data` | Pin sample data to a node so downstream nodes use it during testing (confirm-gated, replace-or-merge) | ✓ |
@@ -158,13 +158,13 @@ Write tools are hidden unless `N8N_ENABLE_EDIT=true`.
 
 **`n8n_archive_workflow`** - `POST /workflows/{id}/archive`. Soft-deletes a workflow: triggers stop firing, the workflow disappears from the default UI list, but the definition and execution history are preserved. Idempotent (archiving an already-archived workflow returns the current state). Requires `confirm: true` (it deactivates and soft-deletes the workflow); reversible via `n8n_unarchive_workflow`. Archiving deactivates as a side effect; the response surfaces `active: false` explicitly. Returns `ok: false` with `reason: "not_found"` on 404.
 
-**`n8n_unarchive_workflow`** - `POST /workflows/{id}/unarchive`. Restores an archived workflow. Does NOT reactivate - triggers stay off until you call `n8n_activate` explicitly. Returns `ok: false` with `reason: "not_found"` on 404.
+**`n8n_unarchive_workflow`** - `POST /workflows/{id}/unarchive`. Restores an archived workflow. Does NOT reactivate - triggers stay off until you call `n8n_activate` explicitly. Requires `confirm: true`; omitting it or passing `false` returns `ok: false` and never touches the API. Returns `ok: false` with `reason: "not_found"` on 404.
 
 **`n8n_delete_workflow`** - `DELETE /workflows/{id}`. Permanent, irreversible. Before firing the DELETE: fetches the current workflow and snapshots it to `backupDir` as `<id>-DELETED-<timestamp>.json` (mode 0600). If the snapshot can't be written, the DELETE is aborted - there is no un-safety-netted path. Requires `confirm: true`; omitting it or passing `false` returns `ok: false` and never touches the API. Returns `ok: false` with `reason: "not_found"` on 404 (either before or after the snapshot). **Restore is one-call via `n8n_create_workflow`** with the snapshot contents; the restored workflow gets a new id and is created inactive. Deleting does NOT cancel running executions - use `n8n_list_executions(workflowId, status='running')` + `n8n_cancel_execution` first if needed. **Prefer `n8n_archive_workflow` for cleanup** if you want to preserve the original id.
 
-**`n8n_cancel_execution`** - `POST /executions/{id}/stop`. Closes the triage loop after `n8n_search_executions` locates a stuck run. Returns a success summary with the execution's final status, or `ok: false` with `reason: "not_found_or_finished"` if the id no longer matches a running execution (404).
+**`n8n_cancel_execution`** - `POST /executions/{id}/stop`. Closes the triage loop after `n8n_search_executions` locates a stuck run. Requires `confirm: true`; omitting it or passing `false` returns `ok: false` and never touches the API. Cancellation can leave a multi-step automation partially applied (e.g. a record written but its follow-up notification or cleanup never run). Returns a success summary with the execution's final status, or `ok: false` with `reason: "not_found_or_finished"` if the id no longer matches a running execution (404).
 
-**`n8n_retry_execution`** - `POST /executions/{id}/retry`. Creates a NEW execution - the response surfaces both `originalExecutionId` and `newExecutionId` so agents can follow up with `n8n_get_execution` on the retry. Optional `loadWorkflow: true` retries against the currently saved workflow instead of the version captured at original execution time. Returns `ok: false` with `reason: "not_found"` on 404 or `reason: "not_retryable"` on 409 (e.g. still running); all other API errors rethrow.
+**`n8n_retry_execution`** - `POST /executions/{id}/retry`. Creates a NEW execution - the response surfaces both `originalExecutionId` and `newExecutionId` so agents can follow up with `n8n_get_execution` on the retry. Requires `confirm: true`; omitting it or passing `false` returns `ok: false` and never touches the API. Each retry may re-run side effects (HTTP calls, DB writes, etc). Verify the workflow is safe to re-run before confirming. Optional `loadWorkflow: true` retries against the currently saved workflow instead of the version captured at original execution time. Returns `ok: false` with `reason: "not_found"` on 404 or `reason: "not_retryable"` on 409 (e.g. still running); all other API errors rethrow.
 
 **`n8n_delete_execution`** - `DELETE /executions/{id}`. Permanently removes an execution record: logs, per-node run data, and error payloads are erased from n8n. Requires `confirm: true` to actually delete; calling with `confirm: false` returns `ok: false` and never touches the API (omitting `confirm` is rejected at the MCP schema layer). Returns `ok: false` with `reason: "not_found"` on 404; all other API errors rethrow. Not idempotent from an agent's perspective: the record is gone after the first successful call, so fetch `n8n_get_execution` first if you may need it later.
 
@@ -442,7 +442,7 @@ Calls `n8n_list_workflows` with a name filter, then `n8n_deactivate` with `confi
 
 > Kill the execution stuck on ECONNREFUSED *(requires `N8N_ENABLE_EDIT=true`)*
 
-Calls `n8n_search_executions` with `query: "ECONNREFUSED"`, then `n8n_cancel_execution` on the match.
+Calls `n8n_search_executions` with `query: "ECONNREFUSED"`, then `n8n_cancel_execution` with `confirm: true` on the match.
 
 > Purge the noisy test-run execution logs from last week *(requires `N8N_ENABLE_EDIT=true`)*
 
@@ -450,7 +450,7 @@ Calls `n8n_search_executions` to find the ids, then `n8n_delete_executions` with
 
 > Archive the old "staging-bot" workflow - I might need it back someday *(requires `N8N_ENABLE_EDIT=true`)*
 
-Calls `n8n_list_workflows` with a name filter, then `n8n_archive_workflow` with `confirm: true` on the match. Reversible via `n8n_unarchive_workflow` (you'll still need `n8n_activate` with `confirm: true` to turn triggers back on).
+Calls `n8n_list_workflows` with a name filter, then `n8n_archive_workflow` with `confirm: true` on the match. Reversible via `n8n_unarchive_workflow` with `confirm: true` (you'll still need `n8n_activate` with `confirm: true` to turn triggers back on).
 
 > Delete the abandoned "poc-scraper" workflow - it's been dead for months *(requires `N8N_ENABLE_EDIT=true`)*
 

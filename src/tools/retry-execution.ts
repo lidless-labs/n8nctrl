@@ -8,6 +8,10 @@ const Schema = Type.Object(
       description:
         "Execution id to retry (from n8n_list_executions or n8n_search_executions).",
     }),
+    confirm: Type.Boolean({
+      description:
+        "Must be true to actually retry. Each retry spawns a new execution that may re-run side effects (HTTP calls, DB writes, etc). Verify the workflow is safe to re-run before confirming.",
+    }),
     loadWorkflow: Type.Optional(
       Type.Boolean({
         description:
@@ -23,13 +27,23 @@ export function createRetryExecutionTool(getClient: () => N8nClient) {
     name: "n8n_retry_execution",
     label: "n8n: retry execution",
     description:
-      "Retry a failed n8n execution by id via POST /executions/{id}/retry. Creates a NEW execution — the response surfaces both the original id and the newExecutionId so agents can follow up. If the id no longer matches an execution (404), returns ok:false with reason 'not_found'. If the execution is not retryable (409 — typically still running), returns ok:false with reason 'not_retryable'. All other API errors rethrow. Optional loadWorkflow:true retries against the current saved workflow rather than the version captured at the original execution time. Requires enableEdit.",
+      "Retry a failed n8n execution by id via POST /executions/{id}/retry. Creates a NEW execution, and the response surfaces both the original id and the newExecutionId so agents can follow up. If the id no longer matches an execution (404), returns ok:false with reason 'not_found'. If the execution is not retryable (409, typically still running), returns ok:false with reason 'not_retryable'. All other API errors rethrow. Optional loadWorkflow:true retries against the current saved workflow rather than the version captured at the original execution time. Requires enableEdit and explicit confirm=true.",
     parameters: Schema,
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
-      const { id, loadWorkflow } = rawParams as {
+      const { id, confirm, loadWorkflow } = rawParams as {
         id: string;
+        confirm: boolean;
         loadWorkflow?: boolean;
       };
+      if (!confirm) {
+        return jsonToolResult({
+          ok: false,
+          action: "retry",
+          originalExecutionId: id,
+          error: "confirm must be true to retry",
+          hint: "Each retry spawns a new execution that may re-run side effects (HTTP calls, DB writes, etc). Verify the workflow is safe to re-run before confirming.",
+        });
+      }
       const client = getClient();
       const opts: { loadWorkflow?: boolean } =
         loadWorkflow === undefined ? {} : { loadWorkflow };
