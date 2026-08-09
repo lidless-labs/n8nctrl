@@ -102,12 +102,25 @@ describe("n8n_archive_workflow", () => {
     expect(details.isArchived).toBe(true);
   });
 
-  it("refuses to archive without confirm=true", async () => {
+  it("refuses without confirm=true and never touches the client", async () => {
     const archiveWorkflow = vi.fn();
     const client = makeFakeClient({ archiveWorkflow });
     const tool = createArchiveWorkflowTool(() => client);
 
     const details = await run(tool, { id: "wf-42" });
+
+    expect(details.ok).toBe(false);
+    expect(details.error).toMatch(/confirm must be true/);
+    expect(details.workflowId).toBe("wf-42");
+    expect(archiveWorkflow).not.toHaveBeenCalled();
+  });
+
+  it("refuses with confirm:false and never touches the client", async () => {
+    const archiveWorkflow = vi.fn();
+    const client = makeFakeClient({ archiveWorkflow });
+    const tool = createArchiveWorkflowTool(() => client);
+
+    const details = await run(tool, { id: "wf-42", confirm: false });
 
     expect(details.ok).toBe(false);
     expect(details.error).toMatch(/confirm must be true/);
