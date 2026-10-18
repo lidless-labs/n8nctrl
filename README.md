@@ -524,8 +524,8 @@ credentials. Bearer tokens use SHA-256 digests and constant-time comparison.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `N8N_MCP_HTTP_TOKEN` | Required | Independent bearer token |
-| `N8N_MCP_HTTP_HOST` | IPv4 loopback | Listener bind host |
+| `N8N_MCP_HTTP_TOKEN` | Required | Independent bearer token, at least 32 characters |
+| `N8N_MCP_HTTP_HOST` | IPv4 loopback | Specific listener bind host; wildcard addresses are refused |
 | `N8N_MCP_HTTP_PORT` | `3117` | TCP port, or `0` for an available port |
 
 The resolved address is printed to stderr. `/mcp` requires bearer authentication
