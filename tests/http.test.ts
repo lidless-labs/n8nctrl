@@ -14,7 +14,7 @@ import type { N8nWorkflow } from "../src/client.ts";
 const TOKEN = randomUUID();
 const env = {
   N8N_BASE_URL: "https://n8n.example.com",
-  N8N_API_KEY: "test-upstream-secret",
+  N8N_API_KEY: "test-upstream-secret-at-least-32-characters",
   N8N_API_KEY_ENV: undefined,
   N8N_MCP_HTTP_TOKEN: TOKEN,
   N8N_MCP_HTTP_PORT: "0",
@@ -119,6 +119,22 @@ describe("authenticated Streamable HTTP", () => {
   ])("refuses missing, blank, or reused credentials", async (token) => {
     configure({ N8N_MCP_HTTP_TOKEN: token });
     await expect(createHttpServer()).rejects.toThrow(/N8N_MCP_HTTP_TOKEN/);
+  });
+
+  it("refuses a token shorter than 32 characters", async () => {
+    configure({ N8N_MCP_HTTP_TOKEN: "a".repeat(31) });
+    await expect(createHttpServer()).rejects.toThrow(/at least 32 characters/);
+  });
+
+  it.each(["0.0.0.0", "::", "[::]"])("refuses wildcard bind host %s", async (host) => {
+    configure({ N8N_MCP_HTTP_HOST: host });
+    await expect(createHttpServer()).rejects.toThrow(/not a wildcard/);
+  });
+
+  it("accepts a token with surrounding whitespace from a secrets file", async () => {
+    const url = await start({ N8N_MCP_HTTP_TOKEN: `  ${TOKEN}\n` });
+    const { client } = await connect(url);
+    expect((await client.listTools()).tools.some((tool) => tool.name === "n8n_list_workflows")).toBe(true);
   });
 
   it.each(["-1", "65536", "abc", "3000suffix", "1.5"])("refuses invalid port %s", async (port) => {
