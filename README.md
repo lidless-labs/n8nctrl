@@ -511,3 +511,103 @@ MIT. See [LICENSE](./LICENSE).
 <p align="center"><sub><strong>Network:</strong> <a href="https://github.com/lidless-labs/librenmsctrl">librenmsctrl</a> &middot; <a href="https://github.com/lidless-labs/watchtower">watchtower</a> &middot; <a href="https://github.com/lidless-labs/portgrid">portgrid</a> &middot; <a href="https://github.com/lidless-labs/cutsheet">cutsheet</a> &middot; <a href="https://github.com/lidless-labs/eero-cli">eero-cli</a></sub></p>
 
 <p align="center"><sub><a href="https://lidless.dev">All tools</a> &middot; <a href="https://github.com/lidless-labs">Lidless Labs on GitHub</a></sub></p>
+
+## HTTP mode
+
+Run a shared Streamable HTTP server with `node dist/mcp-bin.js --http`.
+The existing `node dist/mcp-bin.js` command continues to use stdio.
+
+Set `N8N_BASE_URL`, `N8N_API_KEY` (or the variable selected by
+`N8N_API_KEY_ENV`), and an independent random `N8N_MCP_HTTP_TOKEN`.
+Startup rejects blank HTTP tokens and tokens equal to the API key or URL
+credentials. Bearer tokens use SHA-256 digests and constant-time comparison.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `N8N_MCP_HTTP_TOKEN` | Required | Independent bearer token |
+| `N8N_MCP_HTTP_HOST` | IPv4 loopback | Listener bind host |
+| `N8N_MCP_HTTP_PORT` | `3117` | TCP port, or `0` for an available port |
+
+The resolved address is printed to stderr. `/mcp` requires bearer authentication
+on every POST, GET, and DELETE. `GET /healthz` returns only `{"status":"ok"}`
+without authentication. Host checks reject DNS rebinding. Supplied Origins must
+be HTTP or HTTPS loopback origins. Bodies are limited to 1 MiB, sessions to 128,
+and idle sessions expire after 30 minutes on a minute timer. Active POST calls
+are excluded from idle expiry. SIGTERM and SIGINT close sessions and the listener.
+
+Configuration, including `N8N_ENABLE_EDIT`, `N8N_ENABLE_CREDENTIALS_WRITE`, and
+`N8N_BACKUP_DIR`, is read once at startup and used by every session. Credential
+writes require both write gates. Every mutation still requires `confirm: true`
+on that call. Each session has its own MCP server, lazy API client, and tool
+instances. There are no pending approval tokens or shared tool-visibility sets.
+HTTP mutation calls are serialized across sessions so pin/unpin read-modify-write
+operations cannot overwrite another HTTP call's update. HTTP save/delete backups
+use exclusive writes and UUID suffixes to prevent filename collisions. The backup
+root and file-read confinement stay unchanged. Other processes and direct n8n
+clients can still race with this process's writes.
+
+All clients holding the bearer token share the same n8n account and privileges.
+Keep the default loopback binding. Remote access needs a trusted TLS proxy or
+tunnel and network access controls. This listener provides no TLS or per-client
+accounts. Preserve an allowed Host header through a proxy. Clients must initialize
+again after expiry or restart.
+
+### Claude Code
+
+Add this entry under `mcpServers` in your client configuration:
+
+```json
+{
+  "mcpServers": {
+    "n8n": {
+      "type": "http",
+      "url": "http://localhost:3117/mcp",
+      "headersHelper": "/path/to/helper N8N_MCP_HTTP_TOKEN"
+    }
+  }
+}
+```
+
+The executable helper reads the named environment variable and prints
+`{"Authorization":"Bearer ..."}`. For example, save this as the helper and make
+it executable. Keep its environment private:
+
+```python
+#!/usr/bin/env python3
+import json
+import os
+import sys
+print(json.dumps({"Authorization": "Bearer " + os.environ[sys.argv[1]]}))
+```
+
+### Codex
+
+Export `N8N_MCP_HTTP_TOKEN` in the environment launching Codex and configure:
+
+```toml
+[mcp_servers.n8n]
+url = "http://localhost:3117/mcp"
+bearer_token_env_var = "N8N_MCP_HTTP_TOKEN"
+```
+
+The client needs only the HTTP token. Upstream credentials stay on the server.
+
+### systemd user service
+
+See [the example unit](docs/systemd/n8n-ops-mcp-http.service). Adjust its generic
+installation paths and build the project there. Create the EnvironmentFile at
+`%h/.config/n8n-ops-mcp/http.env` with mode `0600`, containing:
+
+```sh
+N8N_BASE_URL=https://n8n.example.com
+N8N_API_KEY=REPLACE_WITH_UPSTREAM_KEY
+N8N_MCP_HTTP_TOKEN=REPLACE_WITH_INDEPENDENT_RANDOM_TOKEN
+N8N_MCP_HTTP_PORT=3117
+N8N_ENABLE_EDIT=true
+N8N_ENABLE_CREDENTIALS_WRITE=false
+N8N_BACKUP_DIR=/var/lib/n8n-ops-mcp/backups
+```
+
+The backup directory must be writable by the service user. The unit sets
+`NoNewPrivileges=true`, `PrivateTmp=true`, and `UMask=0077`. Installing or starting
+it is a separate operator action.

@@ -69,21 +69,34 @@ type ToolFactoryResult = {
   }>;
 };
 
-export function buildServer(config: N8nPluginConfig): McpServer {
+export interface ServerOptions {
+  runMutation?: <T>(run: () => Promise<T>) => Promise<T>;
+  uniqueBackups?: boolean;
+  redact?: (text: string) => string;
+}
+
+export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}): McpServer {
   const getClient = lazyClient(config);
+
+  let registeringMutations = false;
 
   function bind<Shape extends z.ZodRawShape>(
     server: McpServer,
     tool: ToolFactoryResult,
     shape: Shape,
   ): void {
+    const mutation = registeringMutations;
     const handler = async (args: unknown): Promise<CallToolResult> => {
       try {
-        const res = await tool.execute("mcp", args as Record<string, unknown>);
-        return { content: res.content };
+        const run = () => tool.execute("mcp", args as Record<string, unknown>);
+        const res = await (mutation && options.runMutation ? options.runMutation(run) : run());
+        return { content: options.redact
+          ? res.content.map(item => ({ ...item, text: options.redact!(item.text) }))
+          : res.content };
       } catch (error) {
         // Kit mcp adapter fail() shape with repo-owned redact (not kit defaultRedact).
-        const failed = fail(getClient().redact(operatorErrorMessage(error)));
+        const message = getClient().redact(operatorErrorMessage(error));
+        const failed = fail(options.redact ? options.redact(message) : message);
         return { content: failed.content, isError: failed.isError };
       }
     };
@@ -544,6 +557,7 @@ export function buildServer(config: N8nPluginConfig): McpServer {
   });
 
   if (config.enableEdit) {
+    registeringMutations = true;
     bind(server, createTriggerTool(getClient), {
       mode: z
         .enum(["workflow", "webhook"])
@@ -590,7 +604,7 @@ export function buildServer(config: N8nPluginConfig): McpServer {
 
     bind(
       server,
-      createSaveWorkflowTool({ getClient, backupDir: config.backupDir }),
+      createSaveWorkflowTool({ getClient, backupDir: config.backupDir, uniqueBackups: options.uniqueBackups }),
       {
         id: z.string().describe("Workflow id to overwrite."),
         definition: z
@@ -701,7 +715,7 @@ export function buildServer(config: N8nPluginConfig): McpServer {
 
     bind(
       server,
-      createDeleteWorkflowTool({ getClient, backupDir: config.backupDir }),
+      createDeleteWorkflowTool({ getClient, backupDir: config.backupDir, uniqueBackups: options.uniqueBackups }),
       {
         id: z.string().describe("Workflow id to delete (from n8n_list_workflows)."),
         confirm: z

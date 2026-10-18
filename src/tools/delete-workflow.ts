@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Type } from "@sinclair/typebox";
 import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
@@ -19,6 +20,8 @@ const Schema = Type.Object(
 export interface DeleteWorkflowDeps {
   getClient: () => N8nClient;
   backupDir?: string;
+  /** HTTP sessions use exclusive, collision-resistant snapshot names. */
+  uniqueBackups?: boolean;
 }
 
 export function createDeleteWorkflowTool(deps: DeleteWorkflowDeps) {
@@ -61,7 +64,7 @@ export function createDeleteWorkflowTool(deps: DeleteWorkflowDeps) {
 
       let backupPath: string;
       try {
-        backupPath = await writeBackup(resolveBackupDir(deps.backupDir), current);
+        backupPath = await writeBackup(resolveBackupDir(deps.backupDir), current, deps.uniqueBackups);
       } catch (err) {
         const msg = client.redact(err instanceof Error ? err.message : String(err));
         return jsonToolResult({
@@ -116,7 +119,7 @@ function resolveBackupDir(configured?: string): string {
     : raw;
 }
 
-async function writeBackup(dir: string, wf: N8nWorkflow): Promise<string> {
+async function writeBackup(dir: string, wf: N8nWorkflow, unique = false): Promise<string> {
   await fs.mkdir(dir, { recursive: true });
   const stamp = new Date()
     .toISOString()
@@ -124,7 +127,7 @@ async function writeBackup(dir: string, wf: N8nWorkflow): Promise<string> {
     .replace("T", "_")
     .replace("Z", "");
   const safeName = String(wf.id).replace(/[^A-Za-z0-9_-]/g, "_");
-  const file = path.join(dir, `${safeName}-DELETED-${stamp}.json`);
-  await fs.writeFile(file, JSON.stringify(wf, null, 2), { mode: 0o600 });
+  const file = path.join(dir, `${safeName}-DELETED-${stamp}${unique ? `-${randomUUID()}` : ""}.json`);
+  await fs.writeFile(file, JSON.stringify(wf, null, 2), { mode: 0o600, flag: unique ? "wx" : "w" });
   return file;
 }

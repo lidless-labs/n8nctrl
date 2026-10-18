@@ -1,0 +1,21 @@
+[Unit]
+Description=n8n ops MCP HTTP server
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/n8n-ops-mcp
+ExecStart=/usr/bin/node /opt/n8n-ops-mcp/dist/mcp-bin.js --http
+# Restrict this environment file to mode 0600.
+EnvironmentFile=%h/.config/n8n-ops-mcp/http.env
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=default.target
