@@ -50,7 +50,7 @@ import { createCreateCredentialTool } from "./src/tools/create-credential.ts";
 import { createDeleteCredentialTool } from "./src/tools/delete-credential.ts";
 import { createCheckDisabledNodesTool } from "./src/tools/check-disabled-nodes.ts";
 
-const VERSION = "0.14.0";
+const VERSION = "0.14.3";
 
 function lazyClient(config: N8nPluginConfig): () => N8nClient {
   let cached: N8nClient | undefined;
