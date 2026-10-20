@@ -16,7 +16,7 @@ import { findWorkflowsUsingCredential } from "./tools/find-workflows-using-crede
 import { auditBrowserBridgeUsage } from "./tools/audit-browser-bridge-usage.ts";
 import { runAudit } from "./tools/run-audit.ts";
 
-export const VERSION = "0.14.0";
+export const VERSION = "0.14.3";
 
 export class UsageError extends Error {}
 

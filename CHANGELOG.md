@@ -4,12 +4,20 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.14.3] - 2026-10-19
+
 ### Changed
 - README rewritten to lead with what / why / how-it-differs: ops-focused n8n MCP server, prominent website link, a copy-paste MCP client config that runs via `npx -y n8n-ops-mcp`, a keyword-rich "What it does" section, and explicit "Why not the bigger n8n MCP projects?" and "What n8n-ops-mcp is not" sections. Example hostnames are now a neutral `https://n8n.example.com`.
 - `n8n_unarchive_workflow`, `n8n_retry_execution`, and `n8n_cancel_execution` now require `confirm: true` before they make changes.
 
 ### Added
 - Maintainer-health files: `SECURITY.md` (in/out-of-scope, write-tool side-effect warning, vulnerability reporting), `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, GitHub issue templates (`bug.yml`, `feature.yml`, `config.yml` with `blank_issues_enabled: false` and contact links), and a pull request template with a no-PII / content-guard checkbox.
+
+### Fixed
+- OpenClaw plugin entry now points at the compiled `./dist/index.js`. The previous `./index.ts` entry was not in the published package, so OpenClaw and ClawHub could not load the plugin from npm.
+- The build now emits `dist/index.js` for the OpenClaw plugin entry, and `@lidless-labs/effect-operator-kit` is bundled into `dist/` instead of installed from a git dependency.
+- The npm publish workflow and package metadata from the v0.14.2 release line are now on the default branch, and the publish job audits runtime dependencies only (`npm audit --omit=dev`).
+- Refreshed the lockfile with `npm audit fix`; runtime dependencies audit clean.
 
 ## [0.14.0] - 2026-04-27
 
