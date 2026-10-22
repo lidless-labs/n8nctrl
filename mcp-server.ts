@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { fail, operatorErrorMessage } from "@lidless-labs/effect-operator-kit";
+import { annotationsFor } from "./src/tools/annotations.ts";
 import { z } from "zod";
 
 import type { N8nClient } from "./src/client.ts";
@@ -66,6 +67,7 @@ type ToolFactoryResult = {
   execute: (toolCallId: string, rawParams: Record<string, unknown>) => Promise<{
     content: Array<{ type: "text"; text: string }>;
     details: unknown;
+    structuredContent?: Record<string, unknown>;
   }>;
 };
 
@@ -90,9 +92,11 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
       try {
         const run = () => tool.execute("mcp", args as Record<string, unknown>);
         const res = await (mutation && options.runMutation ? options.runMutation(run) : run());
-        return { content: options.redact
+        const content = options.redact
           ? res.content.map(item => ({ ...item, text: options.redact!(item.text) }))
-          : res.content };
+          : res.content;
+        // Only a truncated result carries structuredContent: the kit's truncation flag.
+        return res.structuredContent ? { content, structuredContent: res.structuredContent } : { content };
       } catch (error) {
         // Kit mcp adapter fail() shape with repo-owned redact (not kit defaultRedact).
         const message = getClient().redact(operatorErrorMessage(error));
@@ -100,7 +104,7 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
         return { content: failed.content, isError: failed.isError };
       }
     };
-    server.tool(tool.name, tool.description, shape, handler as never);
+    server.tool(tool.name, tool.description, shape, annotationsFor(tool.name), handler as never);
   }
 
   const server = new McpServer({
