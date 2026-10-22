@@ -1,5 +1,3 @@
-import { boundResult } from "@lidless-labs/effect-operator-kit";
-
 /**
  * Repo-local success helper. Keeps the historical name, signature, and
  * required-`details` return type that tool call sites, the OpenClaw plugin entry,
@@ -7,11 +5,9 @@ import { boundResult } from "@lidless-labs/effect-operator-kit";
  * emits its non-standard `details` field, and the MCP boundary only forwards
  * `content`.
  *
- * The text is 2-space JSON under the kit's UTF-8 byte cap, measured on the text
- * alone so a large `details` copy does not shrink the usable size. A result over
- * the cap is cut with the kit's `[truncated: ...]` marker, and `details` becomes
- * the kit's `{ truncated: true, originalBytes, returnedBytes, maxBytes }` flag
- * instead of the full payload.
+ * The text is 2-space JSON and is not capped here. The MCP boundary in
+ * `mcp-server.ts` redacts it first and then applies the kit's UTF-8 byte cap, so a
+ * secret cannot be cut in half by the cap and slip past redaction.
  *
  * This repo does not yet route errors through kit `fail` / `refuseUnconfirmed`
  * or batch results through `partialFailure`; write tools still embed
@@ -20,20 +16,9 @@ import { boundResult } from "@lidless-labs/effect-operator-kit";
 export function jsonToolResult<T>(details: T): {
   content: Array<{ type: "text"; text: string }>;
   details: T;
-  structuredContent?: Record<string, unknown>;
 } {
-  const bounded = boundResult<{
-    content: Array<{ type: "text"; text: string }>;
-    structuredContent?: Record<string, unknown>;
-  }>({
-    content: [{ type: "text", text: JSON.stringify(details, null, 2) ?? "null" }],
-  });
-  if (bounded.structuredContent === undefined) {
-    return { content: bounded.content, details };
-  }
   return {
-    content: bounded.content,
-    details: bounded.structuredContent as T,
-    structuredContent: bounded.structuredContent,
+    content: [{ type: "text", text: JSON.stringify(details, null, 2) ?? "null" }],
+    details,
   };
 }

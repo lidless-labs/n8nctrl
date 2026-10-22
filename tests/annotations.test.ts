@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { assertNoDrift, assertToolAnnotations, type ToolAnnotations } from "@lidless-labs/effect-operator-kit";
-import { buildServer } from "../mcp-server.ts";
+import { buildServer, type ServerOptions } from "../mcp-server.ts";
 import type { N8nPluginConfig } from "../src/config.ts";
 import { TOOL_TIERS } from "../src/tools/annotations.ts";
 import { jsonToolResult } from "../src/tools/result.ts";
@@ -55,34 +55,21 @@ describe("tool annotations", () => {
   });
 });
 
-describe("jsonToolResult byte cap", () => {
-  it("returns a small payload with content and details only", () => {
+describe("jsonToolResult", () => {
+  it("returns content and the repo-owned details, uncapped", () => {
     expect(jsonToolResult({ a: 1 })).toEqual({
       content: [{ type: "text", text: JSON.stringify({ a: 1 }, null, 2) }],
       details: { a: 1 },
     });
-  });
-
-  it("truncates an oversize payload with the kit marker and reports the flag as details", () => {
-    const result = jsonToolResult({ rows: "é".repeat(80_000) });
-    expect(Buffer.byteLength(JSON.stringify(result.content), "utf8")).toBeLessThanOrEqual(90_000);
-    expect(result.content[0]!.text).toContain("[truncated: output was");
-    expect(result.structuredContent).toMatchObject({ truncated: true, maxBytes: 90_000 });
-    expect(result.details).toEqual(result.structuredContent);
-  });
-
-  it("keeps a payload that fits as text even when its details copy would not double", () => {
-    const result = jsonToolResult({ rows: "x".repeat(60_000) });
-    expect(result.content[0]!.text).not.toContain("[truncated");
-    expect(result).not.toHaveProperty("structuredContent");
+    expect(jsonToolResult({ rows: "x".repeat(200_000) }).content[0]!.text).not.toContain("[truncated");
   });
 });
 
 describe("MCP boundary byte cap", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  async function call(name: string, args: Record<string, unknown>) {
-    const server = buildServer(config());
+  async function call(name: string, args: Record<string, unknown>, options: ServerOptions = {}) {
+    const server = buildServer(config(), options);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "cap-test", version: "0.0.0" });
     await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
@@ -114,5 +101,31 @@ describe("MCP boundary byte cap", () => {
     const small = await call("n8n_list_workflows", {});
     expect(small.isError).toBe(true);
     expect(small).not.toHaveProperty("structuredContent");
+  });
+
+  it("redacts a secret before the cap, so the cut cannot leave a recognizable fragment", async () => {
+    const token = "tok_" + "k".repeat(28);
+    const total = 100_000;
+    const serve = (name: string) =>
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ data: [{ id: "1", name, active: false }] }), { status: 200, headers: { "content-type": "application/json" } })));
+    const textOf = (result: Awaited<ReturnType<typeof call>>) => (result.content as Array<{ text: string }>)[0]!.text;
+
+    // Find where the cap cuts the text, then straddle that cut with the token.
+    serve("x".repeat(total));
+    const probe = textOf(await call("n8n_list_workflows", {}));
+    const cut = probe.indexOf("[truncated");
+    const nameStart = probe.indexOf("xxxxxxxx");
+    expect(cut).toBeGreaterThan(nameStart);
+    const before = cut - nameStart - 16;
+    const name = "x".repeat(before) + token + "x".repeat(total - before - token.length);
+
+    serve(name);
+    const unredacted = textOf(await call("n8n_list_workflows", {}));
+    expect(unredacted).toContain(token.slice(0, 12)); // the cut really splits the token
+    expect(unredacted).not.toContain(token);
+
+    const redacted = textOf(await call("n8n_list_workflows", {}, { redact: (text) => text.split(token).join("[redacted]") }));
+    expect(redacted).not.toContain(token.slice(0, 12));
+    expect(redacted).toContain("[redacted]");
   });
 });

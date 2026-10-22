@@ -5,7 +5,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ## [Unreleased]
 
 ### Changed
-- Bumped `@lidless-labs/effect-operator-kit` to `1505318b2625fc273c51018389e2c61677e073d7`. MCP tool results are now capped at 90,000 UTF-8 bytes. An oversize result is cut with a `[truncated: output was N bytes, limit is M bytes ...]` marker and carries `structuredContent: { truncated: true, ... }`; the repo-local `details` of a truncated result becomes that flag instead of the full payload. Results under the cap are unchanged.
+- Bumped `@lidless-labs/effect-operator-kit` to `1505318b2625fc273c51018389e2c61677e073d7`. MCP tool results, including error results, are now capped at 90,000 UTF-8 bytes. The cap runs after redaction, so a secret cannot be cut in half by the cut and slip past it. An oversize result is cut with a `[truncated: output was N bytes, limit is M bytes ...]` marker and carries `structuredContent: { truncated: true, ... }`. Results under the cap are unchanged. The repo-owned `details` field on tool results is unchanged.
 - `tools/list` now carries tool annotations. The 20 read tools declare `readOnlyHint: true`; the 20 edit-gated tools (workflow, execution, tag and credential writes, `n8n_trigger`) declare `destructiveHint: true`. Registering a tool with no entry in `src/tools/annotations.ts` throws.
 - API and webhook requests no longer follow redirects, and responses are read through a byte budget (default 10 MiB, `maxResponseBytes` on the client).
 - The client validates its base URL: http(s) only, no embedded credentials.
