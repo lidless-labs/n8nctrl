@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { assertNoDrift, assertToolAnnotations, type ToolAnnotations } from "@lidless-labs/effect-operator-kit";
 import { buildServer } from "../mcp-server.ts";
 import type { N8nPluginConfig } from "../src/config.ts";
@@ -73,5 +75,44 @@ describe("jsonToolResult byte cap", () => {
     const result = jsonToolResult({ rows: "x".repeat(60_000) });
     expect(result.content[0]!.text).not.toContain("[truncated");
     expect(result).not.toHaveProperty("structuredContent");
+  });
+});
+
+describe("MCP boundary byte cap", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function call(name: string, args: Record<string, unknown>) {
+    const server = buildServer(config());
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "cap-test", version: "0.0.0" });
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    try {
+      return await client.callTool({ name, arguments: args });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  }
+
+  it("forwards the truncation flag for an oversize success result", async () => {
+    const rows = Array.from({ length: 400 }, (_, i) => ({ id: String(i), name: "é".repeat(400), active: false }));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ data: rows }), { status: 200, headers: { "content-type": "application/json" } })));
+    const result = await call("n8n_list_workflows", { limit: 250 });
+    expect(Buffer.byteLength(JSON.stringify(result), "utf8")).toBeLessThanOrEqual(90_000);
+    expect(JSON.stringify(result.content)).toContain("[truncated: output was");
+    expect(result.structuredContent).toMatchObject({ truncated: true, maxBytes: 90_000 });
+  });
+
+  it("forwards the truncation flag for an oversize error and leaves a short error flag-free", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("x".repeat(200_000)); }));
+    const big = await call("n8n_list_workflows", {});
+    expect(big.isError).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(big), "utf8")).toBeLessThanOrEqual(90_000);
+    expect(big.structuredContent).toMatchObject({ truncated: true });
+
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("boom"); }));
+    const small = await call("n8n_list_workflows", {});
+    expect(small.isError).toBe(true);
+    expect(small).not.toHaveProperty("structuredContent");
   });
 });

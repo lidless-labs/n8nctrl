@@ -101,7 +101,10 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
         // Kit mcp adapter fail() shape with repo-owned redact (not kit defaultRedact).
         const message = getClient().redact(operatorErrorMessage(error));
         const failed = fail(options.redact ? options.redact(message) : message);
-        return { content: failed.content, isError: failed.isError };
+        // fail() always sets structuredContent; forward it only when it is the truncation flag.
+        return failed.structuredContent?.truncated === true
+          ? { content: failed.content, structuredContent: failed.structuredContent, isError: failed.isError }
+          : { content: failed.content, isError: failed.isError };
       }
     };
     server.tool(tool.name, tool.description, shape, annotationsFor(tool.name), handler as never);
