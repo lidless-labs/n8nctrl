@@ -1,5 +1,5 @@
 import { Type } from "@sinclair/typebox";
-import { promises as fs } from "node:fs";
+import { constants as fsConstants, promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { N8nClient, N8nWorkflow } from "../client.ts";
@@ -222,7 +222,7 @@ export function createDiffWorkflowTool(
         }
         const resolved = confined.path;
         try {
-          const text = await fs.readFile(resolved, "utf8");
+          const text = await readConfinedSnapshot(resolved, backupRoot);
           const parsed: unknown = JSON.parse(text);
           if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
             throw new Error("snapshot file must contain a JSON object");
@@ -279,6 +279,36 @@ export function createDiffWorkflowTool(
       });
     },
   };
+}
+
+// The lexical check in resolveConfinedPath cannot see symlinks. Compare real
+// paths, refuse a final-component symlink at open time, and require a regular
+// file on the opened handle so the check and the read agree.
+async function readConfinedSnapshot(
+  resolved: string,
+  backupRoot: string,
+): Promise<string> {
+  const realRoot = await fs.realpath(backupRoot);
+  const realFile = await fs.realpath(resolved);
+  const rootWithSep = realRoot.endsWith(path.sep) ? realRoot : realRoot + path.sep;
+  if (!realFile.startsWith(rootWithSep)) {
+    throw new Error(
+      `snapshotPath must resolve to a file inside the configured backupDir (${backupRoot}); '${resolved}' resolves outside it through a symlink and was rejected`,
+    );
+  }
+  const handle = await fs.open(
+    realFile,
+    fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0),
+  );
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile()) {
+      throw new Error("snapshot path must be a regular file");
+    }
+    return await handle.readFile("utf8");
+  } finally {
+    await handle.close();
+  }
 }
 
 function resolveBackupDir(configured?: string): string {

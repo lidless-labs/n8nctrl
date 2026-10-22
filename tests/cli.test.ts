@@ -211,3 +211,17 @@ describe("run", () => {
     expect(text).not.toContain("SECRET");
   });
 });
+
+describe("credentials list", () => {
+  it("strips any credential data field before printing", async () => {
+    const { out, deps } = capture({
+      listCredentials: vi.fn().mockResolvedValue({
+        data: [{ id: "c1", name: "Example", type: "githubApi", data: { token: "plaintext-secret" } }],
+      }),
+    });
+    expect(await run(["credentials", "list", "--json"], deps)).toBe(0);
+    const text = out.join("\n");
+    expect(text).not.toContain("plaintext-secret");
+    expect(text).toContain("githubApi");
+  });
+});

@@ -130,7 +130,7 @@ Write tools are hidden unless `N8N_ENABLE_EDIT=true`.
 
 **`n8n_list_executions`** - filter by `workflowId`, `status` (success/error/running/waiting/canceled), `limit`. Pass the previous `nextCursor` as `cursor` to fetch the next page. Returns id, workflowId, workflowName, status, mode, startedAt, stoppedAt.
 
-**`n8n_get_execution`** - includes per-node run log (truncated to `maxExecutionLogBytes`, default 64 KB) and the raw error object verbatim when status is `error`. Pass `includeRunData: false` to skip the run log.
+**`n8n_get_execution`** - returns status, timing, and the error object when status is `error`. Pass `includeRunData: true` to add the per-node run log (truncated to `maxExecutionLogBytes`, default 64 KB). Secret-bearing keys and token-shaped strings are redacted in `error` and `runData`, and the result carries a notice that this content is untrusted workflow output.
 
 **`n8n_search_executions`** - defaults to scanning `status=error` executions for a `query` fragment (e.g. `ECONNREFUSED`) and returning matches with workflow context + a snippet around each hit. `scope: "error"` (default) greps the error payload only; `scope: "all"` also greps full per-node run data (slower, may return node outputs - treat snippets as sensitive). Optional `workflowId`, `status`, `limit` (default 50, max 250), `maxMatches` (default 20), `snippetChars` (default 160). Returns `matches` plus a `skipped` array for any execution that failed to fetch.
 

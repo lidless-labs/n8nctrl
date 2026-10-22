@@ -156,7 +156,7 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
         .boolean()
         .optional()
         .describe(
-          "Include per-node run log. Default true. Turn off for just status + error summary.",
+          "Include per-node run log. Default false (status + error summary only). Set true to add run data, which can contain sensitive node output.",
         ),
     },
   );

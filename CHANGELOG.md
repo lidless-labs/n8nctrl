@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Changed
+- API and webhook requests no longer follow redirects, and responses are read through a byte budget (default 10 MiB, `maxResponseBytes` on the client).
+- The client validates its base URL: http(s) only, no embedded credentials.
+- `n8n_get_execution` now returns status and the error summary by default. Pass `includeRunData: true` for the per-node run log.
+- Execution errors, run data, and search snippets have secret-bearing keys and token-shaped strings redacted, and results carry a notice that the content is untrusted workflow output.
+- `n8n_diff_workflow` compares real paths and opens snapshot files without following a final symlink, so a link inside `backupDir` can no longer point at a file outside it.
+- `n8n_scaffold_browser_bridge_node` requires an absolute `bridgeDir`, rejects control characters, and single-quotes the directory in Execute Command mode.
+- `n8nctrl credentials list` strips any credential `data` field, matching the MCP tool.
+
 ### Fixed
 - `n8n_list_executions` and `n8n_list_workflows` accept a `cursor` input, so a non-null `nextCursor` can be followed to the next page.
 
