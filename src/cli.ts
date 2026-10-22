@@ -15,6 +15,7 @@ import { findWorkflowsUsingNodeType } from "./tools/find-workflows-using-node-ty
 import { findWorkflowsUsingCredential } from "./tools/find-workflows-using-credential.ts";
 import { auditBrowserBridgeUsage } from "./tools/audit-browser-bridge-usage.ts";
 import { runAudit } from "./tools/run-audit.ts";
+import { stripCredentialData } from "./tools/redact-credential.ts";
 
 export const VERSION = "0.14.3";
 
@@ -767,7 +768,8 @@ export async function run(argv: string[], deps: CliDeps): Promise<number> {
         return 0;
       }
       case "credentials-list": {
-        const res = await client.listCredentials({ limit: parsed.limit });
+        const page = await client.listCredentials({ limit: parsed.limit });
+        const res = { ...page, data: page.data.map(stripCredentialData) };
         print(() => renderCredentialsList(asListView(res)), res);
         return 0;
       }

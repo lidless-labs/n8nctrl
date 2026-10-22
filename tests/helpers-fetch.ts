@@ -7,6 +7,8 @@ export interface CapturedCall {
    *  case-insensitive refactors (e.g. swapping to `new Headers(...)`). */
   headers: Record<string, string>;
   body: string | null;
+  /** The `redirect` mode the caller asked fetch to use. */
+  redirect?: string;
 }
 
 export interface FakeResponse {
@@ -65,6 +67,7 @@ export function makeFakeFetch(): FakeFetch {
         method: (init.method ?? "GET").toUpperCase(),
         headers,
         body,
+        redirect: init.redirect,
       });
 
       const next = responses.shift() ?? { status: 200, text: "" };

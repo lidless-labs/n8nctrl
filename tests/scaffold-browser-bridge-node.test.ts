@@ -1,3 +1,7 @@
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, existsSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import { createScaffoldBrowserBridgeNodeTool } from "../src/tools/scaffold-browser-bridge-node.ts";
 
@@ -139,5 +143,73 @@ describe("n8n_scaffold_browser_bridge_node", () => {
       action: "status",
     });
     expect(res).toBeDefined();
+  });
+
+  describe("bridgeDir handling in execute-command mode", () => {
+    it("single-quotes the directory in the cd line", async () => {
+      const details = await run({
+        platform: "coderlegion",
+        action: "status",
+        mode: "execute-command",
+        bridgeDir: "/srv/bridge dir/",
+      });
+      const command = (details.node as { parameters: { command: string } })
+        .parameters.command;
+      expect(command.split("\n")[0]).toBe("cd '/srv/bridge dir'");
+    });
+
+    it("keeps shell metacharacters in the directory inert", async () => {
+      const root = realpathSync(mkdtempSync(path.join(tmpdir(), "bridge-quote-")));
+      const marker = path.join(root, "marker");
+      const dir = path.join(root, `a'b; touch ${marker}; echo '$(id)`);
+      mkdirSync(dir, { recursive: true });
+      try {
+        const details = await run({
+          platform: "coderlegion",
+          action: "status",
+          mode: "execute-command",
+          bridgeDir: dir,
+        });
+        const command = (details.node as { parameters: { command: string } })
+          .parameters.command;
+        const cdLine = command.split("\n")[0];
+        const proc = spawnSync("sh", ["-c", `${cdLine}\npwd`], { encoding: "utf8" });
+        expect(proc.status).toBe(0);
+        expect(proc.stdout.trim()).toBe(dir);
+        expect(existsSync(marker)).toBe(false);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it.each(["code-node", "execute-command"])(
+      "rejects a relative bridgeDir in %s mode",
+      async (mode) => {
+        const tool = createScaffoldBrowserBridgeNodeTool();
+        await expect(
+          tool.execute("call-1", {
+            platform: "coderlegion",
+            action: "status",
+            mode,
+            bridgeDir: "bridge",
+          }),
+        ).rejects.toThrow(/bridgeDir must be an absolute path/);
+      },
+    );
+
+    it.each(["code-node", "execute-command"])(
+      "rejects control characters in bridgeDir in %s mode",
+      async (mode) => {
+        const tool = createScaffoldBrowserBridgeNodeTool();
+        await expect(
+          tool.execute("call-1", {
+            platform: "coderlegion",
+            action: "status",
+            mode,
+            bridgeDir: "/srv/bridge\nrm -rf /",
+          }),
+        ).rejects.toThrow(/control characters/);
+      },
+    );
   });
 });

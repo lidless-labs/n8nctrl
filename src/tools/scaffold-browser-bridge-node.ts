@@ -51,6 +51,7 @@ const Schema = Type.Object(
 );
 
 const SLUG_RE = /^[a-z][a-z0-9-]*$/;
+const CONTROL_CHAR_RE = /[\u0000-\u001f\u007f]/;
 const DEFAULT_BRIDGE_DIR =
   "/home/user/.openclaw/workspace/pipeline/work/browser-bridge";
 
@@ -86,10 +87,7 @@ export function createScaffoldBrowserBridgeNodeTool() {
       }
 
       const mode = params.mode ?? "code-node";
-      const bridgeDir = (params.bridgeDir ?? DEFAULT_BRIDGE_DIR).replace(
-        /\/+$/,
-        "",
-      );
+      const bridgeDir = normalizeBridgeDir(params.bridgeDir ?? DEFAULT_BRIDGE_DIR);
       const nodeName =
         params.nodeName ?? `Browser Bridge: ${platform} ${action}`;
       const position = params.position ?? [0, 0];
@@ -136,6 +134,23 @@ export function createScaffoldBrowserBridgeNodeTool() {
   };
 }
 
+function normalizeBridgeDir(raw: string): string {
+  if (!raw.startsWith("/")) {
+    throw new Error(
+      `bridgeDir must be an absolute path (got: ${JSON.stringify(raw)})`,
+    );
+  }
+  if (CONTROL_CHAR_RE.test(raw)) {
+    throw new Error("bridgeDir must not contain control characters");
+  }
+  return raw.replace(/\/+$/, "") || "/";
+}
+
+// POSIX single-quote escaping: close the quote, emit an escaped quote, reopen.
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 interface BuildArgs {
   nodeName: string;
   position: [number, number];
@@ -157,7 +172,7 @@ function buildExecuteCommandNode(args: BuildArgs): Record<string, unknown> {
   // Quoted heredoc tag ('JSON') — bash leaves the body untouched, so we don't
   // have to escape `$`, backticks, or quotes inside the JSON.
   const command =
-    `cd ${args.bridgeDir}\n` +
+    `cd ${shellQuote(args.bridgeDir)}\n` +
     `node bin/browser-bridge.js ${args.platform} ${args.action} <<'JSON'\n` +
     `${heredocBody}\n` +
     `JSON\n`;

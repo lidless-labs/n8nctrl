@@ -1,5 +1,10 @@
 import { Effect } from "effect";
 import {
+  boundResponse,
+  DEFAULT_MAX_RESPONSE_BYTES,
+  readTextBounded,
+} from "./bounded-response.ts";
+import {
   buildUrl,
   noRetry,
   sendRequest,
@@ -16,6 +21,8 @@ export interface N8nClientOptions {
   baseUrl: string;
   apiKey: string;
   timeoutMs?: number;
+  /** Per-response byte budget for API and webhook calls. Default 10 MiB. */
+  maxResponseBytes?: number;
 }
 
 export interface N8nWorkflowSummary {
@@ -156,11 +163,13 @@ export class N8nClient {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeoutMs: number;
+  private readonly maxResponseBytes: number;
 
   constructor(opts: N8nClientOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
+    this.baseUrl = normalizeBaseUrl(opts.baseUrl);
     this.apiKey = opts.apiKey;
     this.timeoutMs = opts.timeoutMs ?? 15_000;
+    this.maxResponseBytes = opts.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
   }
 
   redact(text: string): string {
@@ -304,9 +313,10 @@ export class N8nClient {
           ...(hasBody ? { "Content-Type": "application/json" } : {}),
         },
         body: hasBody ? JSON.stringify(payload ?? {}) : undefined,
+        redirect: "error",
         signal: controller.signal,
       });
-      const text = await res.text();
+      const text = await readTextBounded(res, this.maxResponseBytes);
       let body: unknown = text;
       if (text) {
         try {
@@ -319,7 +329,8 @@ export class N8nClient {
       }
       return { status: res.status, body };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const failure = describeFetchFailure(err);
+      const msg = failure instanceof Error ? failure.message : String(failure);
       throw new Error(`n8n webhook to ${path} failed: ${redactKey(msg, this.apiKey)}`);
     } finally {
       clearTimeout(timer);
@@ -706,7 +717,7 @@ export class N8nClient {
         Accept: "application/json",
       },
       timeoutMs: this.timeoutMs,
-      fetch: makeCallerAbortFetch(caller),
+      fetch: makeGuardedFetch(caller, this.maxResponseBytes),
       redact: (value) => redactKey(value, this.apiKey),
     };
 
@@ -765,11 +776,26 @@ function normalizeHttpMethod(method: RequestInit["method"]): HttpMethod {
   return (method ?? "GET").toUpperCase() as HttpMethod;
 }
 
-function makeCallerAbortFetch(caller: AbortSignal | null | undefined): typeof fetch {
+function makeGuardedFetch(
+  caller: AbortSignal | null | undefined,
+  maxResponseBytes: number,
+): typeof fetch {
   return async (input, init = {}) => {
     const fetchInput = input instanceof URL ? input.toString() : input;
     const kitSignal = init.signal as AbortSignal | null | undefined;
-    if (!caller) return fetch(fetchInput, init);
+    const guarded: RequestInit = { ...init, redirect: "error" };
+
+    const send = async (signal: AbortSignal | null | undefined) => {
+      try {
+        return await boundResponse(
+          await fetch(fetchInput, { ...guarded, signal }),
+          maxResponseBytes,
+        );
+      } catch (err) {
+        throw describeFetchFailure(err);
+      }
+    };
+    if (!caller) return send(kitSignal);
 
     const controller = new AbortController();
     const abort = () => controller.abort();
@@ -790,12 +816,21 @@ function makeCallerAbortFetch(caller: AbortSignal | null | undefined): typeof fe
     }
 
     try {
-      return await fetch(fetchInput, { ...init, signal: controller.signal });
+      return await send(controller.signal);
     } finally {
       removeKitAbort?.();
       removeCallerAbort?.();
     }
   };
+}
+
+function describeFetchFailure(err: unknown): unknown {
+  if (!(err instanceof Error)) return err;
+  const cause = err.cause instanceof Error ? err.cause.message : "";
+  if (/redirect/i.test(`${err.message} ${cause}`)) {
+    return new Error("redirect refused: n8n requests do not follow redirects");
+  }
+  return err;
 }
 
 function isStatusOperatorError(err: unknown): err is UnexpectedStatusError {
@@ -824,6 +859,23 @@ function operatorErrorMessage(err: unknown): string {
     default:
       return err instanceof Error ? err.message : String(err);
   }
+}
+
+function normalizeBaseUrl(raw: string): string {
+  const trimmed = (raw ?? "").trim();
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error("Invalid n8n base URL: expected an http(s) URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("Invalid n8n base URL: only http and https are supported");
+  }
+  if (url.username || url.password) {
+    throw new Error("Invalid n8n base URL: credentials must not be embedded");
+  }
+  return trimmed.replace(/\/+$/, "");
 }
 
 function assertSafeId(id: string, label: string): void {
