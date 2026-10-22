@@ -397,6 +397,70 @@ describe("n8n_diff_workflow", () => {
       expect(details.error).toMatch(/inside the configured backupDir/);
     });
 
+    it("rejects a symlink inside backupDir that points at a file outside it", async () => {
+      const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "n8n-diff-outside-"));
+      try {
+        const target = path.join(outsideDir, "external.json");
+        await fs.writeFile(target, JSON.stringify(workflow()));
+        await fs.symlink(target, path.join(tmpDir, "link.json"));
+        const client = makeFakeClient({
+          getWorkflow: vi.fn().mockResolvedValue(workflow()),
+        });
+        const tool = buildTool(client, tmpDir);
+
+        const details = await run(tool, { id: "wf-1", snapshotPath: "link.json" });
+        expect(details.ok).toBe(false);
+        expect(details.error).toMatch(/inside the configured backupDir/);
+      } finally {
+        await fs.rm(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it("rejects a path that crosses a symlinked directory out of backupDir", async () => {
+      const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "n8n-diff-outside-"));
+      try {
+        await fs.writeFile(path.join(outsideDir, "external.json"), JSON.stringify(workflow()));
+        await fs.symlink(outsideDir, path.join(tmpDir, "sub"));
+        const client = makeFakeClient({
+          getWorkflow: vi.fn().mockResolvedValue(workflow()),
+        });
+        const tool = buildTool(client, tmpDir);
+
+        const details = await run(tool, {
+          id: "wf-1",
+          snapshotPath: "sub/external.json",
+        });
+        expect(details.ok).toBe(false);
+        expect(details.error).toMatch(/inside the configured backupDir/);
+      } finally {
+        await fs.rm(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it("accepts a symlink that stays inside backupDir", async () => {
+      await fs.writeFile(path.join(tmpDir, "real.json"), JSON.stringify(workflow()));
+      await fs.symlink(path.join(tmpDir, "real.json"), path.join(tmpDir, "alias.json"));
+      const client = makeFakeClient({
+        getWorkflow: vi.fn().mockResolvedValue(workflow()),
+      });
+      const tool = buildTool(client, tmpDir);
+
+      const details = await run(tool, { id: "wf-1", snapshotPath: "alias.json" });
+      expect(details.ok).toBe(true);
+    });
+
+    it("rejects a directory given as the snapshot path", async () => {
+      await fs.mkdir(path.join(tmpDir, "adir"));
+      const client = makeFakeClient({
+        getWorkflow: vi.fn().mockResolvedValue(workflow()),
+      });
+      const tool = buildTool(client, tmpDir);
+
+      const details = await run(tool, { id: "wf-1", snapshotPath: "adir" });
+      expect(details.ok).toBe(false);
+      expect(details.error).toMatch(/failed to read snapshot file/);
+    });
+
     it("returns ok=false when the snapshot file is missing", async () => {
       const missing = path.join(tmpDir, "does-not-exist.json");
       const client = makeFakeClient({
