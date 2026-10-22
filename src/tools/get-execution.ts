@@ -33,8 +33,10 @@ export function createGetExecutionTool(deps: GetExecutionDeps) {
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
       const params = rawParams as { id: string; includeRunData?: boolean };
       const includeRunData = params.includeRunData === true;
+      // n8n only returns the error and lastNodeExecuted with includeData=true,
+      // so the data is always requested. runData is dropped below unless asked for.
       const ex: N8nExecution = await deps.getClient().getExecution(params.id, {
-        includeData: includeRunData,
+        includeData: true,
       });
 
       const status =

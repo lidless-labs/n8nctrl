@@ -36,10 +36,12 @@ async function call(params: Record<string, unknown>) {
 }
 
 describe("n8n_get_execution hardening", () => {
-  it("does not request or return run data by default", async () => {
+  it("returns the error summary but not run data by default", async () => {
     const { details, getExecution } = await call({});
-    expect(getExecution).toHaveBeenCalledWith("9", { includeData: false });
+    // The error and failed node only come back when n8n is asked for the data.
+    expect(getExecution).toHaveBeenCalledWith("9", { includeData: true });
     expect(details.runData).toBeUndefined();
+    expect(details.error).toMatchObject({ message: "failed" });
   });
 
   it("returns run data only when includeRunData is true", async () => {
