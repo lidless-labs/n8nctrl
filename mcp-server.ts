@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { fail, operatorErrorMessage } from "@lidless-labs/effect-operator-kit";
+import { boundResult, fail, operatorErrorMessage } from "@lidless-labs/effect-operator-kit";
+import { annotationsFor } from "./src/tools/annotations.ts";
 import { z } from "zod";
 
 import type { N8nClient } from "./src/client.ts";
@@ -90,17 +91,26 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
       try {
         const run = () => tool.execute("mcp", args as Record<string, unknown>);
         const res = await (mutation && options.runMutation ? options.runMutation(run) : run());
-        return { content: options.redact
+        const content = options.redact
           ? res.content.map(item => ({ ...item, text: options.redact!(item.text) }))
-          : res.content };
+          : res.content;
+        // Cap after redaction so a secret cannot be cut in half and escape it. Only a
+        // truncated result carries structuredContent: the kit's truncation flag.
+        return boundResult<{
+          content: Array<{ type: "text"; text: string }>;
+          structuredContent?: Record<string, unknown>;
+        }>({ content });
       } catch (error) {
         // Kit mcp adapter fail() shape with repo-owned redact (not kit defaultRedact).
         const message = getClient().redact(operatorErrorMessage(error));
         const failed = fail(options.redact ? options.redact(message) : message);
-        return { content: failed.content, isError: failed.isError };
+        // fail() always sets structuredContent; forward it only when it is the truncation flag.
+        return failed.structuredContent?.truncated === true
+          ? { content: failed.content, structuredContent: failed.structuredContent, isError: failed.isError }
+          : { content: failed.content, isError: failed.isError };
       }
     };
-    server.tool(tool.name, tool.description, shape, handler as never);
+    server.tool(tool.name, tool.description, shape, annotationsFor(tool.name), handler as never);
   }
 
   const server = new McpServer({
