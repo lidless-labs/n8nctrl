@@ -4,6 +4,9 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Fixed
+- `n8n_list_executions` and `n8n_list_workflows` accept a `cursor` input, so a non-null `nextCursor` can be followed to the next page.
+
 ## [0.14.3] - 2026-10-19
 
 ### Changed

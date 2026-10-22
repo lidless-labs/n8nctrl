@@ -16,6 +16,12 @@ const Schema = Type.Object(
     limit: Type.Optional(
       Type.Number({ minimum: 1, maximum: 250, description: "Max rows (default 100)." }),
     ),
+    cursor: Type.Optional(
+      Type.String({
+        description:
+          "Pagination cursor from a previous call's `nextCursor`. Omit on first page.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -33,11 +39,13 @@ export function createListWorkflowsTool(getClient: () => N8nClient) {
         tags?: string;
         name?: string;
         limit?: number;
+        cursor?: string;
       };
       const res = await getClient().listWorkflows({
         active: params.active,
         tags: params.tags,
         limit: params.limit ?? 100,
+        cursor: params.cursor,
       });
       const rows = res.data
         .filter((w) => matchName(w, params.name))
