@@ -124,11 +124,11 @@ Write tools are hidden unless `N8N_ENABLE_EDIT=true`.
 <details>
 <summary><b>Detailed tool reference</b></summary>
 
-**`n8n_list_workflows`** - filter by `active`, `tags`, `name` (substring), `limit`. Returns id, name, active state, tags, updatedAt.
+**`n8n_list_workflows`** - filter by `active`, `tags`, `name` (substring), `limit`. Pass the previous `nextCursor` as `cursor` to fetch the next page. Returns id, name, active state, tags, updatedAt.
 
 **`n8n_get_workflow`** - fetch one by id. Returns metadata by default. Pass `includeDefinition: true` for the full node graph + connections.
 
-**`n8n_list_executions`** - filter by `workflowId`, `status` (success/error/running/waiting/canceled), `limit`. Returns id, workflowId, workflowName, status, mode, startedAt, stoppedAt.
+**`n8n_list_executions`** - filter by `workflowId`, `status` (success/error/running/waiting/canceled), `limit`. Pass the previous `nextCursor` as `cursor` to fetch the next page. Returns id, workflowId, workflowName, status, mode, startedAt, stoppedAt.
 
 **`n8n_get_execution`** - returns status, timing, and the error object when status is `error`. Pass `includeRunData: true` to add the per-node run log (truncated to `maxExecutionLogBytes`, default 64 KB). Secret-bearing keys and token-shaped strings are redacted in `error` and `runData`, and the result carries a notice that this content is untrusted workflow output.
 

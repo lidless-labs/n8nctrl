@@ -13,6 +13,9 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - `n8n_scaffold_browser_bridge_node` requires an absolute `bridgeDir`, rejects control characters, and single-quotes the directory in Execute Command mode.
 - `n8nctrl credentials list` strips any credential `data` field, matching the MCP tool.
 
+### Fixed
+- `n8n_list_executions` and `n8n_list_workflows` accept a `cursor` input, so a non-null `nextCursor` can be followed to the next page.
+
 ## [0.14.3] - 2026-10-19
 
 ### Changed

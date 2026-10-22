@@ -28,6 +28,12 @@ const Schema = Type.Object(
         description: "Max rows (default 50).",
       }),
     ),
+    cursor: Type.Optional(
+      Type.String({
+        description:
+          "Pagination cursor from a previous call's `nextCursor`. Omit on first page.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -44,6 +50,7 @@ export function createListExecutionsTool(getClient: () => N8nClient) {
         workflowId?: string;
         status?: string;
         limit?: number;
+        cursor?: string;
       };
       const client = getClient();
       const [executions, workflowIndex] = await Promise.all([
@@ -51,6 +58,7 @@ export function createListExecutionsTool(getClient: () => N8nClient) {
           workflowId: params.workflowId,
           status: params.status,
           limit: params.limit ?? 50,
+          cursor: params.cursor,
         }),
         loadWorkflowNames(client),
       ]);

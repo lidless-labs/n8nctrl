@@ -115,6 +115,10 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
     tags: z.string().optional().describe("Comma-separated tag names to filter by."),
     name: z.string().optional().describe("Case-insensitive substring match on workflow name."),
     limit: z.number().int().min(1).max(250).optional().describe("Max rows (default 100)."),
+    cursor: z
+      .string()
+      .optional()
+      .describe("Pagination cursor from a previous call's `nextCursor`. Omit on first page."),
   });
 
   bind(server, createGetWorkflowTool(getClient), {
@@ -134,6 +138,10 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
       .optional()
       .describe("Filter by execution status."),
     limit: z.number().int().min(1).max(250).optional().describe("Max rows (default 50)."),
+    cursor: z
+      .string()
+      .optional()
+      .describe("Pagination cursor from a previous call's `nextCursor`. Omit on first page."),
   });
 
   bind(
