@@ -28,8 +28,8 @@ export function redactString(text: string): string {
   out = out.replace(/((?:authorization|cookie)\s*:\s*)[^\r\n]+/gi,
     (_match, prefix: string) => `${prefix}${REDACTED}`);
   // Plaintext and quoted-key assignments also appear in prose, errors and raw headers.
-  out = out.replace(/((?:authorization|password|passwd|secret|token|api[-_]?key|cookie)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)/gi, (match, prefix: string) =>
-    match.slice(prefix.length) === "***REDACTED***" ? match : `${prefix}${REDACTED}`);
+  out = out.replace(/((?:pass(?:word|wd|phrase)?|secret|token|api[-_]?key|authorization|cookie|bearer|private[-_]?key|access[-_]?key|session[-_]?id|credential[-_]?data)["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\\r\n])*"|'(?:\\.|[^'\\\r\n])*'|[^\s,;]+)/gi, (match, prefix: string) =>
+    match.slice(prefix.length) === "***REDACTED***" ? match : prefix + REDACTED);
   return out;
 }
 

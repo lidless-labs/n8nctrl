@@ -137,6 +137,8 @@ describe("workflow read output security", () => {
     ["quoted password", 'upstream prose {"password":"fixture-fragment-value"}'],
     ["quoted header", "upstream prose {'X-API-Key':'fixture-fragment-value'}"],
     ["assignment followed by header", 'upstream prose {"note":"token=ordinary","X-API-Key":"fixture-fragment-value"}'],
+    ["private key field", 'upstream prose {"private_key":"fixture-fragment-value"}'],
+    ["escaped quoted value", "upstream prose " + JSON.stringify({ password: 'prefix"fixture-fragment-value' })],
   ])("redacts %s fragments through direct, CLI, and MCP reads", async (_name, prose) => {
     const source = workflow();
     source.nodes[0].parameters.note = prose;
