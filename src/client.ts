@@ -170,6 +170,9 @@ export class N8nClient {
     this.apiKey = opts.apiKey;
     this.timeoutMs = opts.timeoutMs ?? 15_000;
     this.maxResponseBytes = opts.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
+    if (!Number.isSafeInteger(this.maxResponseBytes) || this.maxResponseBytes <= 0) {
+      throw new Error("maxResponseBytes must be a positive safe integer");
+    }
   }
 
   redact(text: string): string {
@@ -680,7 +683,7 @@ export class N8nClient {
     init: RequestInit = {},
   ): Promise<T> {
     const caller = init.signal as AbortSignal | null | undefined;
-    const { signal: _drop, headers: initHeaders, body, method, ...rest } = init;
+    const { signal: _drop, headers: initHeaders, body, method, redirect: _redirect, ...rest } = init;
     const kitBaseUrl = new URL(`${this.baseUrl}/`);
     const kitPath = toKitPath(path);
     buildUrl(kitBaseUrl, kitPath);
@@ -717,6 +720,7 @@ export class N8nClient {
         Accept: "application/json",
       },
       timeoutMs: this.timeoutMs,
+      maxResponseBytes: this.maxResponseBytes,
       fetch: makeGuardedFetch(caller, this.maxResponseBytes),
       redact: (value) => redactKey(value, this.apiKey),
     };
@@ -850,6 +854,10 @@ function operatorErrorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
   }
   switch (err._tag) {
+    case "ResponseTooLargeError":
+      return `response exceeded the ${err.maxResponseBytes} byte limit`;
+    case "ConfigError":
+      return err.message;
     case "TimeoutError":
       return "The operation was aborted";
     case "TransportError":
