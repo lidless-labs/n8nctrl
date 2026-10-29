@@ -3,6 +3,7 @@ import { createGetWorkflowTool } from "../src/tools/get-workflow.ts";
 import { N8nClient } from "../src/client.ts";
 import { makeFakeClient } from "./helpers.ts";
 import { buildServer } from "../mcp-server.ts";
+import { run as runCli } from "../src/cli.ts";
 
 const known = "fixture-known-value";
 const secrets = ["inline-password-value", "inline-header-value", "inline-credential-value", "inline-static-value", "inline-pin-value", known];
@@ -130,6 +131,30 @@ describe("workflow read output security", () => {
     expect(JSON.stringify(mcp)).not.toContain(hidden);
     expect(JSON.stringify(mcp)).not.toContain("fixture-private-value");
     expect(source.nodes[0].parameters.jsonHeaders).toBe(headers);
+  });
+
+  it.each([
+    ["quoted password", 'upstream prose {"password":"fixture-fragment-value"}'],
+    ["quoted header", "upstream prose {'X-API-Key':'fixture-fragment-value'}"],
+    ["assignment followed by header", 'upstream prose {"note":"token=ordinary","X-API-Key":"fixture-fragment-value"}'],
+  ])("redacts %s fragments through direct, CLI, and MCP reads", async (_name, prose) => {
+    const source = workflow();
+    source.nodes[0].parameters.note = prose;
+    const client = makeFakeClient({ getWorkflow: vi.fn().mockResolvedValue(source) });
+    const direct = await createGetWorkflowTool(() => client).execute("t", { id: "wf-1", includeDefinition: true });
+    expect(JSON.stringify(direct)).not.toContain("fixture-fragment-value");
+    const out: string[] = [];
+    expect(await runCli(["workflows", "get", "wf-1", "--full", "--json"], {
+      out: (text) => out.push(text), err: () => {}, makeClient: () => client,
+      getBaseUrl: () => config().baseUrl, serve: async () => {},
+    })).toBe(0);
+    expect(out.join("\n")).not.toContain("fixture-fragment-value");
+    vi.spyOn(N8nClient.prototype, "getWorkflow").mockResolvedValue(source);
+    const server = buildServer(config());
+    const tools = (server as unknown as { _registeredTools: Record<string, { handler: (args: unknown) => Promise<unknown> }> })._registeredTools;
+    const mcp = await tools.n8n_get_workflow.handler({ id: "wf-1", includeDefinition: true });
+    expect(JSON.stringify(mcp)).not.toContain("fixture-fragment-value");
+    expect(source.nodes[0].parameters.note).toBe(prose);
   });
 
 });

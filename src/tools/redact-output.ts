@@ -27,8 +27,8 @@ export function redactString(text: string): string {
   // Raw header strings can contain schemes, spaces and several cookie values.
   out = out.replace(/((?:authorization|cookie)\s*:\s*)[^\r\n]+/gi,
     (_match, prefix: string) => `${prefix}${REDACTED}`);
-  // Plaintext assignments also appear in upstream error messages and raw headers.
-  out = out.replace(/((?:authorization|password|passwd|secret|token|api[-_]?key|cookie)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)/gi, (match, prefix: string) =>
+  // Plaintext and quoted-key assignments also appear in prose, errors and raw headers.
+  out = out.replace(/((?:authorization|password|passwd|secret|token|api[-_]?key|cookie)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)/gi, (match, prefix: string) =>
     match.slice(prefix.length) === "***REDACTED***" ? match : `${prefix}${REDACTED}`);
   return out;
 }
