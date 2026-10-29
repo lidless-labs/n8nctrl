@@ -105,4 +105,31 @@ describe("workflow read output security", () => {
     for (const secret of secrets) expect(JSON.stringify(error)).not.toContain(secret);
     expect(error).toMatchObject({ isError: true });
   });
+  it("parses encoded JSON before assignment redaction on direct and MCP results", async () => {
+    const source = workflow();
+    const hidden = "fixture-later-header-value";
+    const headers = JSON.stringify({
+      note: "token=ordinary",
+      "X-API-Key": hidden,
+      nested: [{ Authorization: "Basic fixture-private-value", keep: "ok" }],
+    });
+    source.nodes[0].parameters.jsonHeaders = headers;
+    const client = makeFakeClient({ getWorkflow: vi.fn().mockResolvedValue(source) });
+    const direct = await createGetWorkflowTool(() => client).execute("t", { id: "wf-1", includeDefinition: true });
+    expect(JSON.stringify(direct)).not.toContain(hidden);
+    expect(JSON.stringify(direct)).not.toContain("fixture-private-value");
+    const details = direct.details as { definition: { nodes: Array<{ parameters: { jsonHeaders: string } }> } };
+    expect(JSON.parse(details.definition.nodes[0]!.parameters.jsonHeaders)).toMatchObject({
+      note: "token=[REDACTED]", "X-API-Key": "[REDACTED]",
+      nested: [{ Authorization: "[REDACTED]", keep: "ok" }],
+    });
+    vi.spyOn(N8nClient.prototype, "getWorkflow").mockResolvedValue(source);
+    const server = buildServer(config());
+    const tools = (server as unknown as { _registeredTools: Record<string, { handler: (args: unknown) => Promise<unknown> }> })._registeredTools;
+    const mcp = await tools.n8n_get_workflow.handler({ id: "wf-1", includeDefinition: true });
+    expect(JSON.stringify(mcp)).not.toContain(hidden);
+    expect(JSON.stringify(mcp)).not.toContain("fixture-private-value");
+    expect(source.nodes[0].parameters.jsonHeaders).toBe(headers);
+  });
+
 });

@@ -40,13 +40,14 @@ export function redactSecrets(
 ): unknown {
   function visit(current: unknown, level: number, credentialContext: boolean): unknown {
     if (typeof current === "string") {
-      const text = redactString(redactKnown(current));
+      // Parse encoded objects before text substitutions can consume JSON quotes.
       // n8n stores JSON headers and other parameter objects as strings too.
-      if (level < MAX_DEPTH && /^[\s]*[\[{]/.test(text)) {
-        try { return JSON.stringify(visit(JSON.parse(text), level + 1, credentialContext)); }
+      if (/^[\s]*[\[{]/.test(current)) {
+        if (level >= MAX_DEPTH) return "[depth limit]";
+        try { return JSON.stringify(visit(JSON.parse(current), level + 1, credentialContext)); }
         catch { /* Non-JSON workflow expressions remain strings. */ }
       }
-      return text;
+      return redactString(redactKnown(current));
     }
     if (current === null || typeof current !== "object") return current;
     if (level >= MAX_DEPTH) return "[depth limit]";
