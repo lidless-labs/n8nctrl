@@ -343,7 +343,7 @@ function resolveConfinedPath(p: string, backupRoot: string): ConfinedPath {
   const resolved = path.resolve(expanded);
   // Confinement: resolved path must be the backup root itself or a descendant.
   // Comparing against `backupRoot + sep` blocks sibling-prefix escapes such as
-  // `/home/u/.n8n-backups-evil` when the root is `/home/u/.n8n-backups`.
+  // `/srv/backups-evil` when the root is `/srv/backups`.
   const rootWithSep = backupRoot.endsWith(path.sep)
     ? backupRoot
     : backupRoot + path.sep;
