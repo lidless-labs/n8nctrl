@@ -56,10 +56,10 @@
     }
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@sinclair/typebox": "^0.34.0",
     "effect": "^3.21.4",
-    "zod": "^4.3.0"
+    "zod": "^4.6.7"
   },
   "peerDependencies": {
     "openclaw": "*"
@@ -88,5 +88,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "overrides": {
+    "body-parser": "^2.4.0"
   }
 }
