@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { N8nClient, N8nExecution } from "../client.ts";
-import { jsonToolResult } from "./result.ts";
+import { untrustedWorkflowResult } from "./result.ts";
 import {
   redactSecrets,
   redactString,
@@ -101,7 +101,9 @@ export async function searchExecutions(
       limit,
     }),
     loadWorkflowNames(client),
-  ]);
+  ]).catch(() => {
+    throw new Error("n8n execution search failed; upstream details suppressed to protect execution secrets");
+  });
 
   const matches: Array<Record<string, unknown>> = [];
   const skipped: Array<{ executionId: string; error: string }> = [];
@@ -112,14 +114,13 @@ export async function searchExecutions(
     scannedCount++;
     let detail: N8nExecution;
     try {
-      detail = await client.getExecution(String(summary.id), {
-        includeData: true,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const raw = await client.getExecution(String(summary.id), { includeData: true });
+      // Protect configured values before the snippet window can split them.
+      detail = redactSecrets(raw, 0, (text) => client.redact(text)) as N8nExecution;
+    } catch {
       skipped.push({
         executionId: String(summary.id),
-        error: client.redact(msg),
+        error: "Execution read failed; upstream details suppressed",
       });
       continue;
     }
@@ -154,7 +155,7 @@ export async function searchExecutions(
     }
   }
 
-  return {
+  return redactSecrets({
     query,
     scope,
     status,
@@ -166,7 +167,7 @@ export async function searchExecutions(
     matches,
     skipped,
     nextCursor: truncated ? null : executions.nextCursor ?? null,
-  };
+  }, 0, (text) => client.redact(text)) as Record<string, unknown>;
 }
 
 export function createSearchExecutionsTool(getClient: () => N8nClient) {
@@ -178,7 +179,7 @@ export function createSearchExecutionsTool(getClient: () => N8nClient) {
     parameters: Schema,
     execute: async (_toolCallId: string, rawParams: Record<string, unknown>) => {
       const params = rawParams as unknown as SearchExecutionsOptions;
-      return jsonToolResult(await searchExecutions(getClient(), params));
+      return untrustedWorkflowResult(await searchExecutions(getClient(), params));
     },
   };
 }
