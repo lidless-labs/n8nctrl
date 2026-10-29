@@ -225,3 +225,64 @@ describe("credentials list", () => {
     expect(text).toContain("githubApi");
   });
 });
+
+
+describe("sensitive CLI inspection", () => {
+  const apiKey = 'configured-key"quoted';
+  const secrets = ["inline-header-secret", "inline-password-secret", "inline-credential-secret", "encoded-secret", "separate-api-secret", apiKey];
+  const message = 'Authorization: Basic inline-header-secret\npassword=inline-password-secret\npassword="encoded-secret"\napiKey=separate-api-secret\n' + apiKey;
+  const fixture = () => ({
+    id: "42", name: message, active: true, benign: "keep-me",
+    nodes: [{ name: "node", type: "n8n-nodes-base.httpRequest", parameters: {
+      headers: [{ name: "Authorization", value: "inline-header-secret" }],
+      password: "inline-password-secret", credentialData: { value: "inline-credential-secret" },
+      encoded: JSON.stringify({ note: "token=ordinary", "X-API-Key": "separate-api-secret", password: "encoded-secret", benign: "encoded-benign" }),
+      known: apiKey,
+    } }],
+    data: { resultData: { error: { message, credentialData: { value: "inline-credential-secret" } }, runData: { benign: "run-benign", password: "inline-password-secret" } } },
+  });
+
+  it.each([
+    ["workflows", "get", "42", "--full"],
+    ["workflows", "get", "42", "--json"],
+    ["executions", "get", "42"],
+    ["executions", "get", "42", "--json"],
+    ["executions", "get", "42", "--no-run-data", "--json"],
+  ])("redacts sensitive structures before human or JSON output: %j", async (...argv) => {
+    const source = fixture();
+    const before = JSON.stringify(source);
+    const { out, deps } = capture({
+      getWorkflow: vi.fn().mockResolvedValue(source), getExecution: vi.fn().mockResolvedValue(source),
+      redact: (text) => text.split(apiKey).join("***REDACTED***"),
+    });
+    expect(await run(argv, deps)).toBe(0);
+    const text = out.join("\n");
+    for (const secret of secrets) expect(text).not.toContain(secret);
+    expect(text).not.toContain(JSON.stringify(apiKey).slice(1, -1));
+    expect(text).toContain("REDACTED");
+    if (argv.includes("--json")) {
+      const result = JSON.parse(text);
+      expect(result.id).toBe("42");
+      expect(result.benign).toBe("keep-me");
+      expect(JSON.parse(result.nodes[0].parameters.encoded).benign).toBe("encoded-benign");
+      expect(result.data.resultData.runData.benign).toBe("run-benign");
+    }
+    expect(JSON.stringify(source)).toBe(before);
+  });
+
+  it.each(["workflows", "executions"])("suppresses raw %s definition fragments in upstream and parse errors", async (group) => {
+    for (const error of [new Error(message), new SyntaxError(`Unexpected token in ${message}`)]) {
+      const { err, deps } = capture({ getWorkflow: vi.fn().mockRejectedValue(error), getExecution: vi.fn().mockRejectedValue(error) });
+      expect(await run([group, "get", "42", "--json"], deps)).toBe(1);
+      expect(err.join("\n")).toContain("details suppressed");
+      for (const secret of secrets) expect(err.join("\n")).not.toContain(secret);
+    }
+  });
+
+  it("preserves credential schema properties and metadata JSON shape", async () => {
+    const schema = { type: "object", properties: { password: { type: "string" }, apiKey: { type: "string" } } };
+    const { out, deps } = capture({ getCredentialSchema: vi.fn().mockResolvedValue(schema) });
+    expect(await run(["credentials", "schema", "example", "--json"], deps)).toBe(0);
+    expect(JSON.parse(out.join("\n"))).toEqual(schema);
+  });
+});

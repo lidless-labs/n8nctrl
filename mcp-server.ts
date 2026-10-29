@@ -137,7 +137,7 @@ export function buildServer(config: N8nPluginConfig, options: ServerOptions = {}
       .boolean()
       .optional()
       .describe(
-        "Include full nodes+connections JSON. Off by default. Turn on when you need to inspect or edit.",
+        "Include the redacted node graph and settings. Off by default. Secret-bearing fields are masked; this is not an exact export.",
       ),
   });
 

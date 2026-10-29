@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
 import type { N8nClient, N8nExecution } from "../client.ts";
-import { jsonToolResult } from "./result.ts";
+import { untrustedWorkflowResult } from "./result.ts";
 import { redactSecrets, UNTRUSTED_CONTENT_NOTICE } from "./redact-output.ts";
 
 const Schema = Type.Object(
@@ -35,9 +35,15 @@ export function createGetExecutionTool(deps: GetExecutionDeps) {
       const includeRunData = params.includeRunData === true;
       // n8n only returns the error and lastNodeExecuted with includeData=true,
       // so the data is always requested. runData is dropped below unless asked for.
-      const ex: N8nExecution = await deps.getClient().getExecution(params.id, {
-        includeData: true,
-      });
+      const client = deps.getClient();
+      let raw: N8nExecution;
+      try {
+        raw = await client.getExecution(params.id, { includeData: true });
+      } catch {
+        throw new Error("n8n execution read failed; upstream details suppressed to protect execution secrets");
+      }
+      // Redact before projection or truncation can split a configured secret.
+      const ex = redactSecrets(raw, 0, (text) => client.redact(text)) as N8nExecution;
 
       const status =
         ex.status ?? (ex.finished ? "success" : "running");
@@ -70,7 +76,7 @@ export function createGetExecutionTool(deps: GetExecutionDeps) {
       if (error !== undefined || hasRunData) {
         body.notice = UNTRUSTED_CONTENT_NOTICE;
       }
-      return jsonToolResult(body);
+      return untrustedWorkflowResult(body);
     },
   };
 }

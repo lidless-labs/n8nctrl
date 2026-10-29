@@ -163,11 +163,14 @@ describe("golden result details contracts", () => {
     });
 
     const getWorkflow = await execute(createGetWorkflowTool(() => client), { id: "wf-1" });
-    expectDetailsField(getWorkflow, {
+    expect(getWorkflow.details).toMatchObject({
       id: "wf-1",
       name: "Nightly sync",
       nodeCount: 1,
     });
+    expect(getWorkflow.content[0].text).toContain("<untrusted_workflow_data>");
+    const workflowJson = getWorkflow.content[0].text.split("<untrusted_workflow_data>\n")[1].split("\n</untrusted_workflow_data>")[0];
+    expect(JSON.parse(workflowJson)).toEqual(getWorkflow.details);
 
     const listTags = await execute(createListTagsTool(() => client), {});
     expectDetailsField(listTags, {

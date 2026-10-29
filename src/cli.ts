@@ -15,6 +15,7 @@ import { findWorkflowsUsingNodeType } from "./tools/find-workflows-using-node-ty
 import { findWorkflowsUsingCredential } from "./tools/find-workflows-using-credential.ts";
 import { auditBrowserBridgeUsage } from "./tools/audit-browser-bridge-usage.ts";
 import { runAudit } from "./tools/run-audit.ts";
+import { redactSecrets } from "./tools/redact-output.ts";
 import { stripCredentialData } from "./tools/redact-credential.ts";
 
 export const VERSION = "0.14.3";
@@ -678,8 +679,8 @@ export async function run(argv: string[], deps: CliDeps): Promise<number> {
         return 0;
       }
       case "workflows-get": {
-        const wf = await client.getWorkflow(parsed.id);
-        print(() => renderWorkflowGet(wf as unknown as Record<string, unknown>, parsed.full), wf);
+        const wf = redactSecrets(await client.getWorkflow(parsed.id), 0, (text) => client.redact(text)) as Record<string, unknown>;
+        print(() => renderWorkflowGet(wf, parsed.full), wf);
         return 0;
       }
       case "workflows-validate": {
@@ -719,8 +720,8 @@ export async function run(argv: string[], deps: CliDeps): Promise<number> {
         return 0;
       }
       case "executions-get": {
-        const ex = await client.getExecution(parsed.id, { includeData: parsed.runData });
-        print(() => renderExecutionGet(ex as unknown as Record<string, unknown>), ex);
+        const ex = redactSecrets(await client.getExecution(parsed.id, { includeData: parsed.runData }), 0, (text) => client.redact(text)) as Record<string, unknown>;
+        print(() => renderExecutionGet(ex), ex);
         return 0;
       }
       case "executions-search": {
@@ -811,8 +812,13 @@ export async function run(argv: string[], deps: CliDeps): Promise<number> {
       }
     }
   } catch (error) {
-    // Kit cli adapter message extraction with repo-owned redact (not kit defaultRedact).
-    deps.err(client.redact(operatorErrorMessage(error)));
+    // Upstream failures and parser diagnostics can quote raw definitions or run data.
+    if (parsed.kind === "workflows-get" || parsed.kind === "executions-get") {
+      deps.err("Unable to read workflow or execution data. Upstream error details suppressed.");
+    } else {
+      // Kit cli adapter message extraction with repo-owned redact (not kit defaultRedact).
+      deps.err(client.redact(operatorErrorMessage(error)));
+    }
     return 1;
   }
   return 0;
