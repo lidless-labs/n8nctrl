@@ -249,8 +249,10 @@ n8nctrl nodes find n8n-nodes-base.slack --contains
 n8nctrl nodes check-disabled
 n8nctrl audit run            # exit 1 if the backend is unreachable (cron-friendly)
 n8nctrl audit browser-bridge
-n8nctrl --json tags list     # raw JSON for piping
+n8nctrl --json tags list     # JSON for piping
 ```
+
+Workflow and execution inspection redacts secret-bearing fields, inline credentials, and the configured API key before human rendering or JSON serialization. `workflows get <id> --json` and `executions get <id> --json` provide redacted inspection views. These views cannot export exact secret-bearing workflow definitions or execution data. Execution run data is included by default, with `--no-run-data` to omit it. Errors from these reads suppress upstream details that could contain raw definitions or execution data. Credential schema properties and metadata commands retain their existing format.
 
 Run `n8nctrl help` for the full command and flag list. Configure with the same `N8N_BASE_URL` / `N8N_API_KEY` env vars as the MCP server (see the table above). Exit codes: `0` success, `1` runtime error (backend unreachable or a call failed), `2` usage error (unknown command/flag or bad value).
 
